@@ -8,6 +8,7 @@ chromosomes <- function(Genome = BSgenome.Hsapiens.UCSC.hg38) { return(BSgenome.
 meth_proportion <- function(data, minimum_reads = 1) { mean(data[reads>=minimum_reads]$prop, rm.na = T) }
 filter_chromosome <- function(data, chromosome) { return(data[chr == chromosome, -"chr"])}
 
+
 meth_proportion_chromosome <- function(data, minimum_reads = 1, chromosome)
 {
   meth_proportion(data[chr==chromosome, ], minimum_reads)
@@ -59,6 +60,42 @@ threshold_binaryzer <- function(data, threshold = 50)
 {
   binarized_rates <- data
   binarized_rates$prop = (data$prop >= threshold)
+  return(binarized_rates)
+}
+
+find_rate_preserving_threshold <- function(props, verbose = T)
+{
+  rate <- mean(props, na.rm = T)/100
+  best_error <- abs(mean(props >= 50, na.rm = T)-rate)
+  best_t <- 50
+  
+  for(t in 51:80)
+  {
+    new_error <- abs(mean(props >= t, na.rm = T)-rate)
+    if(new_error>best_error) return(t)
+    else 
+      {
+        best_error <- new_error
+        best_t <- t
+      }
+  }
+  
+  return(best_t)
+}
+
+rate_preserving_threshold_binaryzer <- function(data, verbose = T)
+{
+  t <- find_rate_preserving_threshold(data$prop)
+  if(verbose) cat("Threshold: ", t, "\n")
+  return(threshold_binaryzer(data, t))
+}
+
+
+stochastic_binaryzer <- function(data)
+{
+  binarized_rates <- data
+  not_nas <- !is.na(data$prop)
+  binarized_rates$prop[not_nas] <- as.logical(rbinom(sum(not_nas), 1, data$prop[not_nas]/100))
   return(binarized_rates)
 }
 
@@ -134,18 +171,12 @@ get_methylation_CpG_binary_vector <- function(data, chromosome = "all", strands_
   return(v)
 }
 
-genome_MSR <- function(methylation_positions, minimum_bin_size = 10, verbose = T)
-{
-  v = sparseVector(i = methylation_positions, x = T, length = max(methylation_positions))
-  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = minimum_bin_size)
-  return(rr)
-}
 
-methylation_experiment_by_chromosome <- function(data_list, names, chromosome, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = replace_no_reads_entries, minimum_bin_size = 20)
+methylation_experiment_by_chromosome <- function(data_list, names, chromosome, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = replace_no_reads_entries, minimum_bin_size = 20, invert = F)
 {
   rr_list = lapply(data_list, function(d) 
   {
-    pos <- get_methylation_positions(d, chromosome = chromosome, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = replace_no_reads_entries)
+    pos <- get_methylation_positions(d, chromosome = chromosome, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = replace_no_reads_entries, invert = invert)
     return(genome_MSR(pos,minimum_bin_size,T))
   })
   
@@ -157,12 +188,12 @@ methylation_experiment_by_chromosome <- function(data_list, names, chromosome, s
   return(List(rr_list=rr_list, plotter=plotter))
 }
 
-methylation_experiment_CpGlist <- function(data_list, names, na_tolerance, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = keep_nas)
+methylation_experiment_CpGlist <- function(data_list, names, na_tolerance, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = keep_nas, invert = F)
 {
   rr_list = lapply(data_list, function(d) 
   {
     binary <- get_methylation_CpG_binary_vector(d, chromosome = "all", strands_handler = strands_handler, methylation_assigner = methylation_assigner, missing_read_handler = missing_read_handler)
-    calculate_relevance_resolution_vector(binary, na_tolerance = na_tolerance, na_values_handler = replace_nas_hybrid_stochastic)
+    calculate_relevance_resolution_vector(binary, na_tolerance = na_tolerance, na_values_handler = replace_nas_hybrid_stochastic, invert = invert)
   })
   
   plotter <- function()

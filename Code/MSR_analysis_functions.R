@@ -179,8 +179,10 @@ good_bin_sizes <- function(n, max_bins = 100, losing_data_prop = 0.001)
 }
 
 
-calculate_relevance_resolution_vector <- function(methylation_vector, na_tolerance = 0, max_bins = 100, no_data_out = F, na_values_handler = replace_nas_hybrid)
+calculate_relevance_resolution_vector <- function(methylation_vector, na_tolerance = 0, max_bins = 100, no_data_out = F, na_values_handler = replace_nas_hybrid, invert = F)
 {
+  if(invert) methylation_vector <- !methylation_vector
+  
   l <- length(methylation_vector)
   bin_sizes <- good_bin_sizes(l, max_bins)
   
@@ -200,8 +202,10 @@ calculate_relevance_resolution_vector <- function(methylation_vector, na_toleran
   }))
 }
 
-calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vector, max_bins = 100, verbose = T, minimum_bin_size = 1)
+calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vector, max_bins = 100, verbose = T, minimum_bin_size = 1, invert = F)
 {
+  if(invert) methylation_vector <- !methylation_vector
+  
   start_time <- Sys.time()
   l <- length(methylation_vector)
   bin_sizes <- good_bin_sizes(l, max_bins)
@@ -254,6 +258,13 @@ calculate_relevance_resolution_vector_with_positions <- function(positions, max_
   gc()
   
   return(out)
+}
+
+genome_MSR <- function(methylation_positions, minimum_bin_size = 10, verbose = T, invert = F)
+{
+  v = sparseVector(i = methylation_positions, x = T, length = max(methylation_positions))
+  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = minimum_bin_size, invert = invert)
+  return(rr)
 }
 
 # supposing resolution is in decresing order

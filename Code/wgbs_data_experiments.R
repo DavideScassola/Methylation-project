@@ -24,8 +24,8 @@
 #################################################################################################
 source("WGBS_analysis_functions.R", chdir = T)
 
-source_directory = "./Scrivania/Tesi/MethylationCode/"
-setwd(source_directory)
+#source_directory = "./Scrivania/Tesi/MethylationCode/"
+#setwd(source_directory)
 file_h1 = "../../MethylationCode/MethylationData/wgbs/ENCFF601NBW_H1_cell_line.bed.gz"
 
 data_h1 <- read_ENCODE_bed(file_h1, verbose = T)
@@ -83,6 +83,14 @@ whole_CpGlist_exp$plotter()
 
 # stomach_props <- sapply(chromosomes(), function(c) meth_proportion_chromosome(data_stomach, 1,c))
 
+rr_50_threshold <- methylation_experiment_CpGlist(List(data_h1, data_stomach),names = c("h1", "stomach"), na_tolerance = 0.1, methylation_assigner = standard_binaryzer)
+rr_adaptive_threshold <- methylation_experiment_CpGlist(List(data_h1, data_stomach),names = c("h1", "stomach"), na_tolerance = 0.1, methylation_assigner = rate_preserving_threshold_binaryzer)
+rr_stochastic <- methylation_experiment_CpGlist(List(data_h1, data_stomach),names = c("h1", "stomach"), na_tolerance = 0.1, methylation_assigner = stochastic_binaryzer)
+
+
+rr_50_threshold_inv <- methylation_experiment_CpGlist(List(data_h1, data_stomach),names = c("h1", "stomach"), na_tolerance = 0.1, methylation_assigner = standard_binaryzer, invert = T)
+rr_adaptive_threshold_inv <- methylation_experiment_CpGlist(List(data_h1, data_stomach),names = c("h1", "stomach"), na_tolerance = 0.1, methylation_assigner = rate_preserving_threshold_binaryzer, invert = T)
+rr_stochastic_inv <- methylation_experiment_CpGlist(List(data_h1, data_stomach),names = c("h1", "stomach"), na_tolerance = 0.1, methylation_assigner = stochastic_binaryzer, invert = T)
 #################################################################################
 
 setwd("./Scrivania/Tesi/MethylationCode/")
