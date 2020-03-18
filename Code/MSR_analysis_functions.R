@@ -1,6 +1,6 @@
 suppressMessages(library(data.table))
 suppressMessages(library(pracma))
-library(parallel)
+suppressMessages(library(parallel))
 
 calculate_relevance_from_counts <- function(vector, M)
 {
@@ -311,7 +311,7 @@ compare_resolution_relevance_plot <- function(relevance_resolution_vector_list, 
     }
   }
   title(title)
-  legend("topleft", legend=legend_names, col=1:n, lty = 1, cex = 0.8)
+  legend("topleft", legend=legend_names, col=1:n, lty = 1, cex = 0.8, y.intersp = 0.8)
 
 }
 
@@ -332,7 +332,7 @@ compare_bin_size_relevance_plot <- function(bsrvl, legend_names, title)
     }
   }
   title(title)
-  legend("topright", legend=legend_names, col=1:n, lty = 1, cex = 0.8)
+  legend("topright", legend=legend_names, col=1:n, lty = 1, cex = 0.8, y.intersp = 0.8)
   
 }
 
@@ -354,7 +354,7 @@ compare_bin_size_resolution_plot <- function(bsrvl, legend_names, title)
     }
   }
   title(title)
-  legend("topright", legend=legend_names, col=1:n, lty = 1, cex = 0.8)
+  legend("topright", legend=legend_names, col=1:n, lty = 1, cex = 0.8, y.intersp = 0.8)
   
 }
 
@@ -374,7 +374,7 @@ compare_resolution_relevance_plot_confidence <- function(relevance_resolution_ve
     }
   }
   title(title)
-  legend("topleft", legend=legend_names, col=1:n, lty = 1, cex = 0.8)
+  legend("topleft", legend=legend_names, col=1:n, lty = 1, cex = 0.8, y.intersp = 0.8)
   
 }
 
@@ -450,10 +450,10 @@ apply_same_missing_data_pattern <- function(vector, mask_vector)
 
 
 ##############################################################################
-library(Matrix)
-library(BSgenome.Mmusculus.UCSC.mm10)
-library(BSgenome.Hsapiens.UCSC.hg38)
-require(Biostrings)
+suppressMessages(library(Matrix))
+suppressMessages(library(BSgenome.Mmusculus.UCSC.mm10))
+suppressMessages(library(BSgenome.Hsapiens.UCSC.hg38))
+suppressMessages(require(Biostrings))
 
 #load("DataCleaning/CpG_sites_dataframe.RData")
 

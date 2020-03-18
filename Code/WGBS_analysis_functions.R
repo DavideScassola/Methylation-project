@@ -1,6 +1,6 @@
 source("MSR_analysis_functions.R", chdir = T)
 
-filter_strand     <- function(data, sign) { return(data[strand==sign, -c(2)]) }
+filter_strand     <- function(data, sign) { return(data[strand==sign, -"strand"]) }
 pick_plus_strand  <- function(data)       { return(filter_strand(data,"+"))}
 pick_minus_strand <- function(data)       { return(filter_strand(data,"-"))}
 ignore_strands    <- function(data)       { return(data[, -"strand"]) }
@@ -42,7 +42,9 @@ sum_strands <- function(data, verbose = T)
   unstranded_data$prop = new_prop
   
   gc()
-  return(unstranded_data[,-"strand"])
+  #print(unstranded_data)
+  #return(unstranded_data[,-"strand"])
+  return(unstranded_data)
 }
 
 read_ENCODE_bed <- function(file, chromosome = "all", verbose = T)
@@ -160,8 +162,9 @@ get_methylation_CpG_binary_vector <- function(data, chromosome = "all", strands_
   else
     out <- filter_chromosome(data, chromosome)
   
+  #print((out))
   # solving various problems
-  out <- clean_bed_file(data, strands_handler, methylation_assigner, missing_read_handler)
+  out <- clean_bed_file(out, strands_handler, methylation_assigner, missing_read_handler)
   
   cat("Methylation proportion: ", mean(out$prop, na.rm = T),"\n")
   
@@ -176,7 +179,7 @@ methylation_experiment_by_chromosome <- function(data_list, names, chromosome, s
 {
   rr_list = lapply(data_list, function(d) 
   {
-    pos <- get_methylation_positions(d, chromosome = chromosome, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = replace_no_reads_entries, invert = invert)
+    pos <- get_methylation_positions(d, chromosome = chromosome, strands_handler = strands_handler, methylation_assigner = methylation_assigner, missing_read_handler = missing_read_handler, invert = invert)
     return(genome_MSR(pos,minimum_bin_size,T))
   })
   
