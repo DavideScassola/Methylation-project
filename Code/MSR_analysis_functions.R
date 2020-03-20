@@ -263,7 +263,7 @@ calculate_relevance_resolution_vector_with_positions <- function(positions, max_
 genome_MSR <- function(methylation_positions, minimum_bin_size = 10, verbose = T, invert = F)
 {
   v = sparseVector(i = methylation_positions, x = T, length = max(methylation_positions))
-  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = minimum_bin_size, invert = invert)
+  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = minimum_bin_size, invert = invert, verbose = verbose)
   return(rr)
 }
 
@@ -300,7 +300,7 @@ bin_size_resolution_plot <- function(relevance_resolution_vector)
 
 compare_resolution_relevance_plot <- function(relevance_resolution_vector_list, legend_names, title)
 {
-  plot(x = (relevance_resolution_vector_list[[1]])[2,], y = (relevance_resolution_vector_list[[1]])[1,], type = "l", col = 1, xlab = "resolution", ylab = "relevance", ylim = c(0,0.8))
+  plot(x = (relevance_resolution_vector_list[[1]])[2,], y = (relevance_resolution_vector_list[[1]])[1,], type = "l", col = 1, xlab = "resolution", ylab = "relevance", ylim = c(0,0.5))
   grid(nx = NULL, ny = NULL, col = "lightgray", lty = "dotted")
   n <- length(relevance_resolution_vector_list)
   if(n>1)
@@ -311,7 +311,7 @@ compare_resolution_relevance_plot <- function(relevance_resolution_vector_list, 
     }
   }
   title(title)
-  legend("topleft", legend=legend_names, col=1:n, lty = 1, cex = 0.8, y.intersp = 0.8)
+  legend("topleft", legend=legend_names, col=1:n, lty = 1, cex = 0.7, y.intersp = 0.5)
 
 }
 

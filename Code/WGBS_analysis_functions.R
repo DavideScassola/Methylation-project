@@ -175,12 +175,12 @@ get_methylation_CpG_binary_vector <- function(data, chromosome = "all", strands_
 }
 
 
-methylation_experiment_by_chromosome <- function(data_list, names, chromosome, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = replace_no_reads_entries, minimum_bin_size = 20)
+methylation_experiment_by_chromosome <- function(data_list, names, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = keep_nas, invert = F)
 {
   rr_list = lapply(data_list, function(d) 
   {
     pos <- get_methylation_positions(d, chromosome = chromosome, strands_handler = strands_handler, methylation_assigner = methylation_assigner, missing_read_handler = missing_read_handler)
-    return(genome_MSR(pos,minimum_bin_size,T))
+    return(genome_MSR(pos,minimum_bin_size,T,invert = invert))
   })
   
   plotter <- function()
