@@ -262,7 +262,8 @@ calculate_relevance_resolution_vector_with_positions <- function(positions, max_
 
 genome_MSR <- function(methylation_positions, minimum_bin_size = 10, verbose = T, invert = F)
 {
-  v = sparseVector(i = methylation_positions, x = T, length = max(methylation_positions))
+  v = methylation_positions - min(methylation_positions) + 1
+  v = sparseVector(i = v, x = T, length = max(v))
   rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = minimum_bin_size, invert = invert, verbose = verbose)
   return(rr)
 }
