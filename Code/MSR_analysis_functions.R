@@ -109,7 +109,7 @@ calculate_relevance_and_resolution <- function(methylation_vector, cumulative_su
   data_size <- l-cumulative_na_vector[l+1]
   
   if(bin_size==1) return(c(0,1,1,1))
-  #if(bin_size==l) return(c(0,0,l,NA))
+  if(bin_size==l) return(c(0,0,l,NA))
   
   counts_and_na <- array(dim = c(2,(l/bin_size)+1))
   valid_bins_found <- 0
@@ -179,7 +179,7 @@ good_bin_sizes <- function(n, max_bins = 100, losing_data_prop = 0.001)
 }
 
 
-calculate_relevance_resolution_vector <- function(methylation_vector, na_tolerance = 0, max_bins = 100, no_data_out = F, na_values_handler = replace_nas_hybrid, invert = F)
+calculate_relevance_resolution_vector <- function(methylation_vector, na_tolerance = 0, max_bins = 100, no_data_out = F, na_values_handler = replace_nas_hybrid, invert = F, verbose = T)
 {
   if(invert) methylation_vector <- !methylation_vector
   
@@ -198,7 +198,7 @@ calculate_relevance_resolution_vector <- function(methylation_vector, na_toleran
   
   return(sapply(bin_sizes, function(x) 
   { 
-    calculate_relevance_and_resolution(methylation_vector, cumulative_sum_vector, cumulative_nas_vector, x, na_tolerance =na_tolerance , no_data_out = no_data_out, na_values_handler = na_values_handler)
+    calculate_relevance_and_resolution(methylation_vector, cumulative_sum_vector, cumulative_nas_vector, x, na_tolerance =na_tolerance , no_data_out = no_data_out, na_values_handler = na_values_handler, verbose = verbose)
   }))
 }
 
@@ -301,7 +301,7 @@ bin_size_resolution_plot <- function(relevance_resolution_vector)
 
 compare_resolution_relevance_plot <- function(relevance_resolution_vector_list, legend_names, title)
 {
-  plot(x = (relevance_resolution_vector_list[[1]])[2,], y = (relevance_resolution_vector_list[[1]])[1,], type = "l", col = 1, xlab = "resolution", ylab = "relevance", ylim = c(0,0.5))
+  plot(x = (relevance_resolution_vector_list[[1]])[2,], y = (relevance_resolution_vector_list[[1]])[1,], type = "l", col = 1, xlab = "resolution", ylab = "relevance", ylim = c(0,0.5), xlim = c(0,1))
   grid(nx = NULL, ny = NULL, col = "lightgray", lty = "dotted")
   n <- length(relevance_resolution_vector_list)
   if(n>1)
@@ -499,6 +499,8 @@ mouse_dinucleotides_experiment <- function(pattern_list, chromosome)
 
 
 #############################################################################
+
+subset_positions <- function(pos, start, size) { pos[pos>=start & pos<=(start+size)] }
 
 
 

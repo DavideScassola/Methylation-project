@@ -138,7 +138,7 @@ clean_bed_file <- function(data, strands_handler, methylation_assigner, missing_
   return(missing_read_handler(methylation_assigner(strands_handler(data))))
 }
 
-get_methylation_positions <- function(data, chromosome, strands_handler, methylation_assigner, missing_read_handler)
+ouget_methylation_positions <- function(data, chromosome, strands_handler, methylation_assigner, missing_read_handler)
 {
   #filter a chromosome
   out <- filter_chromosome(data, chromosome)
@@ -207,6 +207,23 @@ methylation_experiment_CpGlist <- function(data_list, names, na_tolerance, stran
   return(List(rr_list=rr_list, plotter=plotter))
 }
 
+find_few_na_window <- function(binary_vector, size, rate = 0.1)
+{
+  start <- 1
+  l <- length(binary_vector)
+  max_nas <- rate*size
+  while(start<(l-size))
+  {
+    nas <- sum(is.na(binary_vector[start:(start+size)]))
+    #cat("start:", start, " nas: ", nas)
+    if(nas>max_nas) start = start + (nas-max_nas)
+    else return(start)
+  }
+  
+  cat("\nnot found")
+  return(0)
+}
+
 all_chromosome_methylation_experiment <- function(data_list, names, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = replace_no_reads_entries, minimum_bin_size = 20)
 {
   pdf("genome_wide_experiment.pdf")
@@ -224,4 +241,91 @@ all_chromosome_methylation_experiment <- function(data_list, names, strands_hand
   
   dev.off()
 }
+
+different_scales_experiment <- function(data_list, size_list, names, na_tolerance, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = keep_nas, invert = F)
+{
+  
+  rr_list = lapply(data_list, function(d) 
+  {
+    binary <- get_methylation_CpG_binary_vector(d, chromosome = "all", strands_handler = strands_handler, methylation_assigner = methylation_assigner, missing_read_handler = missing_read_handler)
+    rr_dim_list = lapply(size_list, function(s)
+    {
+      start <- find_few_na_window(binary, s, rate = 0.05)
+      M = sum(binary[(1+start):(s+start)], na.rm = T)
+      cat("M:", M, " M/size", M/s, "\n")
+      calculate_relevance_resolution_vector(binary[(1+start):(s+start)], na_tolerance = na_tolerance, na_values_handler = replace_nas_hybrid_stochastic, invert = invert)
+    })
+    return(rr_dim_list)
+  })
+  
+  return(rr_list)
+}
+
+
+different_scales_experiment_genomewide <- function(data_list, size_list, offset=0, chromosome, names, na_tolerance, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = replace_no_reads_entries, invert = F)
+{
+  
+  rr_list = lapply(data_list, function(d) 
+  {
+    pos <- get_methylation_positions(d, chromosome, strands_handler, methylation_assigner, missing_read_handler)
+    print(max(pos))
+    rr_dim_list = mclapply(size_list, mc.cores = 1, function(s)
+    {
+      new_pos = (pos[pos>offset & pos<(offset+s)])
+      cat("M: ", length(new_pos), "M/size:", length(new_pos)/s, "\n")
+      genome_MSR(new_pos, minimum_bin_size = 20, invert = F, verbose = F)
+    })
+    
+  })
+  
+  return(rr_list)
+}
+
+different_positions_scale_CpG_list_experiment <- function(data_list, size, na_tolerance, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = keep_nas, invert = F, undersample = 0)
+{
+  rr_list = lapply(data_list, function(d) 
+  {
+    binary <- get_methylation_CpG_binary_vector(d, chromosome = "all", strands_handler = strands_handler, methylation_assigner = methylation_assigner, missing_read_handler = missing_read_handler)
+    
+    l <- length(binary)
+    fragments <- floor(l/size)
+    start_list <- ((0:(fragments-1))*size)+1
+    cat("fragments: ", fragments, "\n")
+    
+    if(undersample!=0)
+      start_list <- sample(start_list, undersample, replace=F)
+    
+    rr_fragments_list = lapply(start_list, function(s)
+    {
+      calculate_relevance_resolution_vector(binary[(s):(size+s)], na_tolerance = na_tolerance, na_values_handler = replace_nas_hybrid_stochastic, invert = invert)
+    })
+    return(rr_fragments_list)
+  })
+  
+  return(rr_list)
+}
+
+different_positions_scale_by_chromosome_experiment <- function(d, size, chromosome, minimum_bin_size = 30, strands_handler = sum_strands, methylation_assigner = standard_binaryzer, missing_read_handler = replace_no_reads_entries, invert = F, undersample = 0)
+{
+  
+  pos <- get_methylation_positions(d, chromosome,  strands_handler, methylation_assigner, missing_read_handler)
+  
+  l <- max(pos)
+  fragments <- floor(l/size)
+  start_list <- ((0:(fragments-1))*size)+1
+  cat("fragments: ", fragments, "\n")
+  
+  if(undersample!=0)
+    start_list <- sample(start_list, undersample, replace=F)
+  
+  rr_fragments_list = mclapply(start_list, mc.cores = 1, function(s)
+  {
+    cat("start: ", s, "end: ", size+s, "max: ", l, "\n")
+    if(length(pos[pos>s & pos<=(s+size)])<100) return(NA)
+    genome_MSR(pos[pos>s & pos<=(s+size)], invert = invert,minimum_bin_size = minimum_bin_size )
+  })
+  return(rr_fragments_list[!is.na(rr_fragments_list)])
+}
+
+
 
