@@ -138,7 +138,7 @@ clean_bed_file <- function(data, strands_handler, methylation_assigner, missing_
   return(missing_read_handler(methylation_assigner(strands_handler(data))))
 }
 
-ouget_methylation_positions <- function(data, chromosome, strands_handler, methylation_assigner, missing_read_handler)
+get_methylation_positions <- function(data, chromosome, strands_handler, methylation_assigner, missing_read_handler)
 {
   #filter a chromosome
   out <- filter_chromosome(data, chromosome)
