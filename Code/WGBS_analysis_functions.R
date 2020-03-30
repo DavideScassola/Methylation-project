@@ -327,5 +327,145 @@ different_positions_scale_by_chromosome_experiment <- function(d, size, chromoso
   return(rr_fragments_list[!is.na(rr_fragments_list)])
 }
 
+spatial_MSR_experiment_CpG_list <- function(binary, invert, window_size, fake_data, na_tolerance)
+{
+  l <- length(binary)
+  
+  if(fake_data)
+  {
+    prop <- mean(binary, na.rm=T)
+    binary <- rbinom(l, 1, prop)
+  }
+  
+  
+  fragments <- floor(l/window_size)
+  start_list <- ((0:(fragments-1))*window_size)+1
+  cat("fragments: ", fragments, "\n")
+  
+  fragments_infos_array = array(dim = c(fragments, 3))
+  
+  rr_fragments_list = lapply(1:fragments, function(i)
+  {
+    cat(i, "...\n")
+    sub <- binary[start_list[i]:(start_list[i]+window_size)]
+    fragments_infos_array[i,1] <- start_list[i]
+    fragments_infos_array[i,2] <- mean(sub,na.rm=T)
+    rr <- calculate_relevance_resolution_vector(sub, verbose=F, na_tolerance = na_tolerance, na_values_handler = replace_nas_hybrid_stochastic, invert = invert)
+    fragments_infos_array[i,3] <- MSR_area(rr)
+    return(rr)
+  })
+  
+  fragments_infos_array[,1] <- start_list
+  fragments_infos_array[,2] <-  sapply(1:fragments, function(i) 
+  {
+    mean(binary[start_list[i]:(start_list[i]+window_size)],na.rm=T)
+  })
+  if(invert) fragments_infos_array[,2]= 1 - fragments_infos_array[,2]
+  
+  fragments_infos_array[,3] <-  sapply(rr_fragments_list, function(rr) MSR_area(rr))
+  
+  return(List(fragments_infos_array=fragments_infos_array, rr_list=rr_fragments_list))
+}
+
+bernoulli_positions <- function(max, prop)
+{
+  unique(sort(round(runif(min = 1, max=max, n = prop*(max-1)))))
+}
+
+
+spatial_MSR_experiment_by_chromosome <- function(pos, window_size, fake_data, minimum_bin_size, cores = 1)
+{
+  l = max(pos)-min(pos)+1
+  
+  if(fake_data)
+  {
+    prop <- length(pos)/l
+    pos  <- bernoulli_positions(l, prop)
+  }
+  
+  fragments <- floor(l/window_size)
+  start_list <- ((0:(fragments-1))*window_size)+1
+  cat("fragments: ", fragments, "\n")
+  
+  fragments_infos_array = array(dim = c(fragments, 3))
+  
+  rr_fragments_list = mclapply(1:fragments, mc.cores = cores, function(i)
+  {
+    cat(i, "...\n")
+    
+    sub <- subset_positions(pos, start_list[i], window_size)
+    
+    if(length(sub)<5)
+      rr <- NA
+    else
+      rr <- genome_MSR(sub,minimum_bin_size,verbose=F)
+    
+  })
+  
+  fragments_infos_array[,1] <- start_list
+  fragments_infos_array[,2] <-  sapply(1:fragments, function(i) 
+  {
+    sub <- subset_positions(pos, start_list[i], window_size)
+    length(sub)/window_size
+  })
+  
+  fragments_infos_array[,3] <-  sapply(rr_fragments_list, function(rr) 
+  {
+    if(length(rr)==1) return(NA)
+    else MSR_area(rr)})
+  
+  valids <- (!is.na(fragments_infos_array[,3]))
+  get_valid_rrs <- function() {return(rr_fragments_list[valids])}
+  return(List(fragments_infos_array=fragments_infos_array, rr_list=rr_fragments_list, get_valid_rrs=get_valid_rrs))
+}
+
+total_spatial_experiment <- function(files, sizes, inversion, names, methylation_assigner, na_tolerance, fake_data)
+{
+  result = List()
+  
+  for(i in 1:length(files))
+  {
+    data <- read_ENCODE_bed(files[i], verbose = T)
+    binary <- get_methylation_CpG_binary_vector(data,strands_handler = sum_strands, methylation_assigner = methylation_assigner, missing_read_handler = keep_nas)
+    remove(data)
+    gc()
+    
+    for(inv in inversion)
+    {
+      result_si = lapply(sizes, function(s)
+      {
+        gc()
+        rrs <- spatial_MSR_experiment_CpG_list(binary, inv, s, fake_data, na_tolerance)
+        return(List(name=names[i], inverted=inv, window_size=s, data=rrs))
+      })
+      result[[paste(names[i], "inverted:", inv, sep = "_")]] <- result_si
+    }
+  }
+  return(result)
+}
+
+total_spatial_experiment_by_chromosome <- function(files, sizes, chromosome, names, methylation_assigner, fake_data, minimum_bin_size = 20, cores = 1)
+{
+  result = List()
+  
+  for(i in 1:length(files))
+  {
+    data <- read_ENCODE_bed(files[i], verbose = T)
+    pos <- get_methylation_positions(data, chromosome, sum_strands, methylation_assigner = methylation_assigner, missing_read_handler = replace_no_reads_entries)
+    remove(data)
+    gc()
+    
+    result_si = lapply(sizes, function(s)
+    {
+      gc()
+      rrs <- spatial_MSR_experiment_by_chromosome(pos, s, fake_data, minimum_bin_size, cores = cores)
+      return(List(name=names[i], window_size=s, data=rrs))
+    })
+    result[[(names[i])]] <- result_si
+    
+  }
+  return(result)
+}
+
 
 

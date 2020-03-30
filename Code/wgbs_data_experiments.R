@@ -16,139 +16,7 @@ data_lung <- read_ENCODE_bed(file_lung, verbose = T)
 
 
 #######################################################################################################
-spatial_MSR_experiment_CpG_list <- function(binary, invert, window_size, fake_data, na_tolerance)
-{
-  l <- length(binary)
-  
-  if(fake_data)
-  {
-    prop <- mean(binary, na.rm=T)
-    binary <- rbinom(l, 1, prop)
-  }
-  
-  
-  fragments <- floor(l/window_size)
-  start_list <- ((0:(fragments-1))*window_size)+1
-  cat("fragments: ", fragments, "\n")
-  
-  fragments_infos_array = array(dim = c(fragments, 3))
-  
-  rr_fragments_list = lapply(1:fragments, function(i)
-  {
-    cat(i, "...\n")
-    sub <- binary[start_list[i]:(start_list[i]+window_size)]
-    fragments_infos_array[i,1] <- start_list[i]
-    fragments_infos_array[i,2] <- mean(sub,na.rm=T)
-    rr <- calculate_relevance_resolution_vector(sub, verbose=F, na_tolerance = na_tolerance, na_values_handler = replace_nas_hybrid_stochastic, invert = invert)
-    fragments_infos_array[i,3] <- MSR_area(rr)
-    return(rr)
-  })
-  
-  fragments_infos_array[,1] <- start_list
-  fragments_infos_array[,2] <-  sapply(1:fragments, function(i) 
-  {
-    mean(binary[start_list[i]:(start_list[i]+window_size)],na.rm=T)
-  })
-  if(invert) fragments_infos_array[,2]= 1 - fragments_infos_array[,2]
-  
-  fragments_infos_array[,3] <-  sapply(rr_fragments_list, function(rr) MSR_area(rr))
-  
-  return(List(fragments_infos_array=fragments_infos_array, rr_list=rr_fragments_list))
-}
 
-bernoulli_positions <- function(max, prop)
-{
-  round(runif(min = 1, max=max, n = prop*(max-1)))
-}
-
-
-spatial_MSR_experiment_by_chromosome <- function(pos, window_size, fake_data, minimum_bin_size)
-{
-  l = max(pos)-min(pos)+1
-  
-  if(fake_data)
-  {
-    prop <- length(pos)/l
-    pos  <- bernoulli_positions(max, prop)
-  }
-  
-  
-  fragments <- floor(l/window_size)
-  start_list <- ((0:(fragments-1))*window_size)+1
-  cat("fragments: ", fragments, "\n")
-  
-  fragments_infos_array = array(dim = c(fragments, 3))
-  
-  rr_fragments_list = lapply(1:fragments, function(i)
-  {
-    cat(i, "...\n")
-    sub <- subset_positions(pos, start_list[i], window_size)
-    
-    if(length(sub)<3)
-      rr <- NA
-    else
-      rr <- genome_MSR(sub,minimum_bin_size,verbose=F)
-  })
-  
-  fragments_infos_array[,1] <- start_list
-  fragments_infos_array[,2] <-  sapply(1:fragments, function(i) 
-  {
-    sub <- subset_positions(pos, start_list[i], window_size)
-    length(pos)/window_size
-  })
-  
-  fragments_infos_array[,3] <-  sapply(rr_fragments_list, function(rr) MSR_area(rr))
-  
-  return(List(fragments_infos_array=fragments_infos_array, rr_list=rr_fragments_list))
-}
-
-total_spatial_experiment <- function(files, sizes, inversion, names, methylation_assigner, na_tolerance, fake_data)
-{
-  result = List()
-  
-  for(i in 1:length(files))
-  {
-    data <- read_ENCODE_bed(files[i], verbose = T)
-    binary <- get_methylation_CpG_binary_vector(data,strands_handler = sum_strands, methylation_assigner = methylation_assigner, missing_read_handler = keep_nas)
-    remove(data)
-    gc()
-    
-      for(inv in inversion)
-      {
-        result_si = lapply(sizes, function(s)
-        {
-          gc()
-          rrs <- spatial_MSR_experiment_CpG_list(binary, inv, s, fake_data, na_tolerance)
-          return(List(name=names[i], inverted=inv, window_size=s, data=rrs))
-        })
-        result[[paste(names[i], "inverted:", inv, sep = "_")]] <- result_si
-      }
-  }
-  return(result)
-}
-
-total_spatial_experiment_by_chromosome <- function(files, sizes, chromosome, names, methylation_assigner, fake_data, minimum_bin_size = 20)
-{
-  result = List()
-  
-  for(i in 1:length(files))
-  {
-    data <- read_ENCODE_bed(files[i], verbose = T)
-    pos <- get_methylation_positions(data, chromosome, sum_strands, methylation_assigner = methylation_assigner, missing_read_handler = replace_no_reads_entries)
-    remove(data)
-    gc()
-    
-      result_si = lapply(sizes, function(s)
-      {
-        gc()
-        rrs <- spatial_MSR_experiment_by_chromosome(pos, s, fake_data, minimum_bin_size)
-        return(List(name=names[i], window_size=s, data=rrs))
-      })
-      result[[(names[i])]] <- result_si
-    
-  }
-  return(result)
-}
 
 
 #######################################################################################################################
@@ -175,16 +43,27 @@ save(total_exp, file = "total_exp.Rdata")
 
 #################################################################
 files = c(file_h1, file_stomach)
+files = c(file_h1)
 names = c("H1","stomach")
+names = c("H1")
 sizes = c(1e4, 1e5, 1e6, 1e7)
-chromosome = "chr1"
+sizes = c(1e4, 1e5)
+chromosome = "chr22"
 
+
+data_h1 = read_ENCODE_bed(file_h1)
+data_h1 = filter_chromosome(data_h1, chromosome = "chr1")
+pos <- clean_bed_file(data_h1, sum_strands, stochastic_binaryzer, replace_no_reads_entries)$Cpos
+subpos = subset_positions(pos, 129837, 1e6)
+
+a = spatial_MSR_experiment_by_chromosome(pos, 1e6, F, 100)
+  
 system.time(
-  total_exp_chr1 <- total_spatial_experiment_by_chromosome(files, sizes, chromosome, names, stochastic_binaryzer, fake_data=F, minimum_bin_size = 30)
+  total_exp_chr1 <- total_spatial_experiment_by_chromosome(files, sizes, chromosome, names, stochastic_binaryzer, fake_data=F, minimum_bin_size = 100)
 )
 
 system.time(
-  total_exp_chr1 <- total_spatial_experiment_by_chromosome(files, sizes, chromosome, names, stochastic_binaryzer, fake_data=T, minimum_bin_size = 30)
+  total_exp_chr1_fake <- total_spatial_experiment_by_chromosome(files, sizes, chromosome, names, stochastic_binaryzer, fake_data=T, minimum_bin_size = 100)
 )
 
 save(total_exp_chr1, file = "total_exp_chr1.Rdata")

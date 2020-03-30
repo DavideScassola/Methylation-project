@@ -79,6 +79,7 @@ corrected_cumsum <- function(vector)
 # PLEASE USE A SPARSE MATRIX IF POSSIBLE
 calculate_relevance_and_resolution_ignoring_nas <- function(methylation_vector, cumulative_sum_vector, bin_size) 
 {
+
   l <- length(methylation_vector)
   if(bin_size==1) return(c(0,1,1,1))
   
@@ -92,11 +93,10 @@ calculate_relevance_and_resolution_ignoring_nas <- function(methylation_vector, 
     gc(verbose = F)
   }
 
-  
   M <- cumulative_sum_vector[l+1]
   relevance <- calculate_relevance_from_counts(counts, M)
   resolution <- calculate_resolution_from_counts(counts, M)
-  
+
   return(c(relevance, resolution, bin_size, 1))
 }
 
@@ -217,13 +217,13 @@ calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vecto
   
   if(verbose) cat("Calculating cumulative sum vector \n")
   cumulative_sum_vector <- corrected_cumsum(replaced_nas_vector)
-  
+
   #################################
   # I don't want my RAM to explode
   remove(replaced_nas_vector, nas)
-  gc()
+  if(l>1e7) gc()
   #################################
-  
+
   out <- (sapply(bin_sizes, function(x) 
   { 
     if(verbose) cat(x, "...\n")
@@ -232,7 +232,6 @@ calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vecto
   
   end_time <- Sys.time()
   if(verbose) print(end_time-start_time)
-  gc()
   
   return(out)
 }
@@ -255,7 +254,6 @@ calculate_relevance_resolution_vector_with_positions <- function(positions, max_
   
   end_time <- Sys.time()
   if(verbose) print(end_time-start_time)
-  gc()
   
   return(out)
 }
@@ -272,6 +270,7 @@ genome_MSR <- function(methylation_positions, minimum_bin_size = 10, verbose = T
 MSR_area<- function(rr_vector, M_correction = 10)
 {
   return(trapz(x = rev(rr_vector[2,]), y = rev(rr_vector[1,]))*log10(M_correction))
+  
 }
 
 calculate_MSR_area<- function(v)
