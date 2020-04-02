@@ -18,6 +18,22 @@ data_lung <- read_ENCODE_bed(file_lung, verbose = T)
 #######################################################################################################
 
 
+load(file = "../../Rexperiments/total_exp_chr1.Rdata")
+total_exp_chr1$stomach[[1]]$data$fragments_infos_array
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #######################################################################################################################
 file_h1 = "../../MethylationCode/MethylationData/wgbs/ENCFF601NBW_H1_cell_line.bed.gz"
@@ -48,18 +64,17 @@ names = c("H1","stomach")
 names = c("H1")
 sizes = c(1e4, 1e5, 1e6, 1e7)
 sizes = c(1e4, 1e5)
-chromosome = "chr22"
+chromosome = "chrY"
 
 
-data_h1 = read_ENCODE_bed(file_h1)
-data_h1 = filter_chromosome(data_h1, chromosome = "chr1")
-pos <- clean_bed_file(data_h1, sum_strands, stochastic_binaryzer, replace_no_reads_entries)$Cpos
-subpos = subset_positions(pos, 129837, 1e6)
+data_stomach = read_ENCODE_bed(file_stomach)
+pos <- get_methylation_positions(data_stomach, "chr1", sum_strands, stochastic_binaryzer, replace_no_reads_entries)
+subpos = subset_positions(pos, 0, 1e5)
 
-a = spatial_MSR_experiment_by_chromosome(pos, 1e6, F, 100)
+a = spatial_MSR_experiment_by_chromosome(subpos, 1e4, F, 10)
   
 system.time(
-  total_exp_chr1 <- total_spatial_experiment_by_chromosome(files, sizes, chromosome, names, stochastic_binaryzer, fake_data=F, minimum_bin_size = 100)
+  total_exp_chr1 <- total_spatial_experiment_by_chromosome(files, sizes, chromosome, names, stochastic_binaryzer, fake_data=F, minimum_bin_size = 200, mc = T)
 )
 
 system.time(

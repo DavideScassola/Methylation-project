@@ -373,7 +373,7 @@ bernoulli_positions <- function(max, prop)
 }
 
 
-spatial_MSR_experiment_by_chromosome <- function(pos, window_size, fake_data, minimum_bin_size, cores = 1)
+spatial_MSR_experiment_by_chromosome <- function(pos, window_size, fake_data, minimum_bin_size)
 {
   l = max(pos)-min(pos)+1
   
@@ -389,7 +389,7 @@ spatial_MSR_experiment_by_chromosome <- function(pos, window_size, fake_data, mi
   
   fragments_infos_array = array(dim = c(fragments, 3))
   
-  rr_fragments_list = mclapply(1:fragments, mc.cores = cores, function(i)
+  rr_fragments_list = lapply(1:fragments, function(i)
   {
     cat(i, "...\n")
     
@@ -411,7 +411,7 @@ spatial_MSR_experiment_by_chromosome <- function(pos, window_size, fake_data, mi
   
   fragments_infos_array[,3] <-  sapply(rr_fragments_list, function(rr) 
   {
-    if(length(rr)==1) return(NA)
+    if(length(rr)<=1) return(NA)
     else MSR_area(rr)})
   
   valids <- (!is.na(fragments_infos_array[,3]))
@@ -444,7 +444,7 @@ total_spatial_experiment <- function(files, sizes, inversion, names, methylation
   return(result)
 }
 
-total_spatial_experiment_by_chromosome <- function(files, sizes, chromosome, names, methylation_assigner, fake_data, minimum_bin_size = 20, cores = 1)
+total_spatial_experiment_by_chromosome <- function(files, sizes, chromosome, names, methylation_assigner, fake_data, minimum_bin_size = 20, mc = F)
 {
   result = List()
   
@@ -455,10 +455,12 @@ total_spatial_experiment_by_chromosome <- function(files, sizes, chromosome, nam
     remove(data)
     gc()
     
-    result_si = lapply(sizes, function(s)
+    cores = 1
+    if(mc) cores = length(sizes)
+    result_si = mclapply(sizes, mc.cores = cores, function(s)
     {
       gc()
-      rrs <- spatial_MSR_experiment_by_chromosome(pos, s, fake_data, minimum_bin_size, cores = cores)
+      rrs <- spatial_MSR_experiment_by_chromosome(pos, s, fake_data, minimum_bin_size)
       return(List(name=names[i], window_size=s, data=rrs))
     })
     result[[(names[i])]] <- result_si
