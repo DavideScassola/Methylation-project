@@ -18,12 +18,12 @@ data_lung <- read_ENCODE_bed(file_lung, verbose = T)
 #######################################################################################################
 
 
-load(file = "../../Rexperiments/total_exp_chr1.Rdata")
-total_exp_chr1$stomach[[1]]$data$fragments_infos_array
+load(file = "../../Rexperiments/total_exp.Rdata")
+load(file = "../../Rexperiments/total_exp_fake.Rdata")
+plot(total_exp$`H1_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2], pch = "+")
 
 
-
-
+total_exp$`H1_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2]
 
 
 
@@ -52,7 +52,7 @@ system.time(
   total_exp_fake <- total_spatial_experiment(files, sizes, inversion, names, methylation_assigner = stochastic_binaryzer, na_tolerance = 0.1, fake_data = T)
 )
 
-save(total_exp, file = "total_exp_fake.Rdata")
+save(total_exp_fake, file = "total_exp_fake.Rdata")
 save(total_exp, file = "total_exp.Rdata")
 #######################################################################################################################
 
