@@ -471,3 +471,28 @@ total_spatial_experiment_by_chromosome <- function(files, sizes, chromosome, nam
 
 
 
+total_spatial_experiment_for_dinucleotides_locations_by_chromosome <- function(pattern_list = c("CG"), sizes, chromosome, fake_data, minimum_bin_size = 20, mc = F)
+{
+  result = List()
+  
+  for(i in 1:length(pattern_list))
+  {
+    pos <- nucleotides_pattern_positions(chromosome, pattern_list[i], Genome = BSgenome.Hsapiens.UCSC.hg38)
+    gc()
+    
+    cores = 1
+    if(mc) cores = length(sizes)
+    result_si = mclapply(sizes, mc.cores = cores, function(s)
+    {
+      gc()
+      rrs <- spatial_MSR_experiment_by_chromosome(pos, s, fake_data, minimum_bin_size)
+      return(List(name=pattern_list[i], window_size=s, data=rrs))
+    })
+    result[[(pattern_list[i])]] <- result_si
+    
+  }
+  return(result)
+}
+
+
+
