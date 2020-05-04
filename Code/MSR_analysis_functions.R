@@ -1,6 +1,7 @@
 suppressMessages(library(data.table))
 suppressMessages(library(pracma))
 suppressMessages(library(parallel))
+suppressMessages(library(scales))
 
 calculate_relevance_from_counts <- function(vector, M)
 {
@@ -501,7 +502,57 @@ mouse_dinucleotides_experiment <- function(pattern_list, chromosome)
 
 subset_positions <- function(pos, start, size) { pos[pos>=start & pos<=(start+size)] }
 
+pos_to_neighbor_counts  <- function(pos, dinucleotides_neighborhood_ranges, centered = T)
+{
+  max_half = max(dinucleotides_neighborhood_ranges)/2
+  v = (pos - min(pos) + 1)+max_half
+  v2 = sparseVector(i = v, x = T, length = max(v)+max_half)
+  cumulative_sum_vector <- corrected_cumsum(v2)
+  #cat("\ncumulative_sum_vector: ", cumulative_sum_vector)
+  #cat("\npos: ", pos, "\n")
+  #cat("v: ", v, "\n")
+  result = sapply(dinucleotides_neighborhood_ranges, function(r)
+  {
+    cumulative_sum_vector[v+r/2]-cumulative_sum_vector[v-r/2]
+  })
+  remove(cumulative_sum_vector)
+  colnames(result) <- (dinucleotides_neighborhood_ranges)
+  gc()
+  return(as.data.frame(result))
+  #sum(pos<pos+half & pos>pos-half)
+}
 
+filter_odd_position_values <- function(v)
+{
+  v[2*(0:(ceiling(length(v)/2)-1))+1]
+}
+
+get_CpG_densities <- function(dinucleotides_neighborhood_ranges, Genome = BSgenome.Hsapiens.UCSC.hg38, data = NA)
+{
+  chr_list = chromosomes(Genome = BSgenome.Hsapiens.UCSC.hg38)
+  n = length(chr_list)
+
+  CpGlists <- lapply(chr_list, function(chr)
+    {
+     cat("processing ", chr, "\n")
+    if(type(data)=="logical")
+      pos <- nucleotides_pattern_positions(chr, "CG", Genome = Genome)
+    else
+      pos <- filter_odd_position_values(filter_chromosome(data,chr)$Cpos)
+     gc()
+     pos_to_neighbor_counts(pos, dinucleotides_neighborhood_ranges)
+    })
+     gc()
+  
+  result <- data.frame()
+  
+  for(p in CpGlists)
+  {
+    result = rbind(result,p)
+  }
+
+  return(result)
+}
 
 
 #setwd("./Scrivania/Tesi/MethylationCode/")

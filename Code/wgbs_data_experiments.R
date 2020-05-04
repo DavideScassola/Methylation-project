@@ -20,21 +20,86 @@ data_lung <- read_ENCODE_bed(file_lung, verbose = T)
 
 load(file = "../../Rexperiments/total_exp.Rdata")
 load(file = "../../Rexperiments/total_exp_fake.Rdata")
-plot(total_exp$`H1_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2], pch = "+")
+load(file = "../../Rexperiments/total_exp_chr1.Rdata")
+load(file = "../../Rexperiments/total_exp_chr1_fake.Rdata")
+load(file = "../../Rexperiments/CG_exp.Rdata")
+
+CpG_positions <- nucleotides_pattern_positions("chr1", "CG", BSgenome.Hsapiens.UCSC.hg38)
+CpG_densities <- get_CpG_densities(dinucleotides_neighborhood_ranges = c(50,100,300,500,1000,5000),data = data_stomach)
+
+d_h1 = total_exp$`H1_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2]
+d_stomach = total_exp$`stomach_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2]
+d_fake = total_exp_fake$`H1_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2]
+
+bin_h1 = get_methylation_CpG_binary_vector(data_h1,methylation_assigner = stochastic_binaryzer, missing_read_handler = keep_nas, strands_handler = sum_strands)
+bin_s = get_methylation_CpG_binary_vector(data_stomach,methylation_assigner = standard_binaryzer, missing_read_handler = keep_nas, strands_handler = sum_strands)
 
 
-total_exp$`H1_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2]
+box_comparison <- function(exp, explanation, density = F, names = c("1e3", "1e4", "1e5", "1e6"))
+{
+  i = 3
+  ylab = "msr"
+  if(density)
+    {
+    i = 2
+    ylab = "density"
+  }
+  
+  msr_1e3 = exp[[1]]$data$fragments_infos_array[,i]
+  msr_1e4 = exp[[2]]$data$fragments_infos_array[,i]
+  msr_1e5 = exp[[3]]$data$fragments_infos_array[,i]
+  msr_1e6 = exp[[4]]$data$fragments_infos_array[,i]
+  
+  boxplot(msr_1e3, msr_1e4, msr_1e5, msr_1e6, names = names , xlab = "window size", ylab = ylab)
+  title(explanation)
+}
 
 
 
+density_MSR_correlation <- function(exp, explanation, fix = T, windows = c("1e3", "1e4", "1e5", "1e6"))
+{
+  
+  for(i in 1:length(windows))
+  {
+    density= exp[[i]]$data$fragments_infos_array[,2]
+    msr = exp[[i]]$data$fragments_infos_array[,3]
+    if(fix)
+      plot(density,msr, xlim = c(0,1), ylim = c(0,0.32), col = alpha(1,0.5))
+    else
+      plot(density,msr, col = alpha(1,0.5))
+    #scatterhist(density,msr, xlab = "density", ylab = "msr")
+    title(paste(explanation, windows[i]))
+    par(ask=TRUE)
+    print(cor.test(density,msr))
+  }
+  par(ask=FALSE)
+}
 
+################################################################################################
 
+density_MSR_correlation(total_exp$`H1_inverted:_FALSE`, "H1")
+box_comparison(total_exp$`H1_inverted:_FALSE`, explanation = "H1", density = T)
+box_comparison(total_exp$`H1_inverted:_FALSE`, explanation = "H1", density = F)
 
+density_MSR_correlation(total_exp$`H1_inverted:_TRUE`, "H1, inverted")
+box_comparison(total_exp$`H1_inverted:_TRUE`, explanation = "H1, inverted", density = T)
+box_comparison(total_exp$`H1_inverted:_TRUE`, explanation = "H1, inverted", density = F)
 
+density_MSR_correlation(total_exp$`stomach_inverted:_FALSE`, "stomach")
+box_comparison(total_exp$`stomach_inverted:_FALSE`, explanation = "stomach", density = T)
+box_comparison(total_exp$`stomach_inverted:_FALSE`, explanation = "stomach", density = F)
 
+density_MSR_correlation(total_exp$`stomach_inverted:_TRUE`, "stomach, inverted")
+box_comparison(total_exp$`stomach_inverted:_TRUE`, explanation = "stomach, inverted", density = T)
+box_comparison(total_exp$`stomach_inverted:_TRUE`, explanation = "stomach, inverted", density = F)
 
+density_MSR_correlation(total_exp_fake$`stomach_inverted:_TRUE`, "stomach, inverted")
+box_comparison(total_exp_fake$`stomach_inverted:_TRUE`, explanation = "stomach, inverted", density = T)
+box_comparison(total_exp_fake$`stomach_inverted:_TRUE`, explanation = "stomach, inverted", density = F)
 
-
+density_MSR_correlation(CG_exp$CG, "CG", windows = c("1e4", "1e5", "1e6", "1e7"), fix = T)
+box_comparison(CG_exp$CG, explanation = "CG", names = c("1e4", "1e5", "1e6", "1e7"), density = T)
+box_comparison(CG_exp$CG, explanation = "CG", names = c("1e4", "1e5", "1e6", "1e7"), density = F)
 #######################################################################################################################
 file_h1 = "../../MethylationCode/MethylationData/wgbs/ENCFF601NBW_H1_cell_line.bed.gz"
 file_stomach = "../../MethylationCode/MethylationData/wgbs/ENCFF844EFX_stomach_man_51.bed.gz"
