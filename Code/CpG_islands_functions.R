@@ -1,4 +1,4 @@
-setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
+#setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
 source("WGBS_analysis_functions.R", chdir = T)
 
 # HOW TO GENERATE CPG ISL DATA
@@ -9,7 +9,7 @@ source("WGBS_analysis_functions.R", chdir = T)
 #save(file = "../../MethylationCode/MethylationData/CpGislands.Rdata", CpGislands)
 ############################################################
 
-load("../../MethylationCode/MethylationData/CpGislands.Rdata")
+#load("../../MethylationCode/MethylationData/CpGislands.Rdata")
 
 filter_island <- function(chromosome, start, end, data)
 {

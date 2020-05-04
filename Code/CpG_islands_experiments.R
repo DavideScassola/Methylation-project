@@ -1,7 +1,9 @@
 
 
 setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
+load("../../MethylationCode/MethylationData/CpGislands.Rdata")
 source("CpG_islands_functions.R", chdir = T)
+
 
 ############## ULISSE ################
 setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
