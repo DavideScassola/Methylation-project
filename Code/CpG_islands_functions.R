@@ -60,11 +60,10 @@ island_meth_counter1 <- function(island)
 
 islands_meth_data <- function(data, island_meth_counter, cores = 1)
 {
-  load("../../MethylationCode/MethylationData/CpGislands.Rdata")
+  #load("../../MethylationCode/MethylationData/CpGislands.Rdata")
   
     d = sum_strands(data)
     l = length(CpGislands$start)
-    l = 10
     cat("\nprocessing . . .\n")
     methylation_prop = mcmapply(1:l, mc.preschedule = T, mc.cores = cores, FUN =  function(n)
     {
