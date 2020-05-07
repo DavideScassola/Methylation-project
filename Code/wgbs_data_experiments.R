@@ -3,8 +3,6 @@
 setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
 source("WGBS_analysis_functions.R", chdir = T)
 
-#source_directory = "./Scrivania/Tesi/MethylationCode/"
-#setwd(source_directory)
 file_h1 = "../../MethylationCode/MethylationData/wgbs/ENCFF601NBW_H1_cell_line.bed.gz"
 data_h1 <- read_ENCODE_bed(file_h1, verbose = T)
 
@@ -14,25 +12,14 @@ data_stomach <- read_ENCODE_bed(file_stomach, verbose = T)
 file_lung = "../../MethylationData/wgbs/ENCFF039JFT_lung.bed.gz"
 data_lung <- read_ENCODE_bed(file_lung, verbose = T)
 
-
 #######################################################################################################
-
 
 load(file = "../../Rexperiments/total_exp.Rdata")
 load(file = "../../Rexperiments/total_exp_fake.Rdata")
 load(file = "../../Rexperiments/total_exp_chr1.Rdata")
 load(file = "../../Rexperiments/total_exp_chr1_fake.Rdata")
 load(file = "../../Rexperiments/CG_exp.Rdata")
-
-CpG_positions <- nucleotides_pattern_positions("chr1", "CG", BSgenome.Hsapiens.UCSC.hg38)
-CpG_densities <- get_CpG_densities(dinucleotides_neighborhood_ranges = c(50,100,300,500,1000,5000),data = data_stomach)
-
-d_h1 = total_exp$`H1_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2]
-d_stomach = total_exp$`stomach_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2]
-d_fake = total_exp_fake$`H1_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2]
-
-bin_h1 = get_methylation_CpG_binary_vector(data_h1,methylation_assigner = stochastic_binaryzer, missing_read_handler = keep_nas, strands_handler = sum_strands)
-bin_s = get_methylation_CpG_binary_vector(data_stomach,methylation_assigner = standard_binaryzer, missing_read_handler = keep_nas, strands_handler = sum_strands)
+#load(file = "../../Rexperiments/CG_exp_small.Rdata")
 
 
 box_comparison <- function(exp, explanation, density = F, names = c("1e3", "1e4", "1e5", "1e6"))
@@ -55,7 +42,6 @@ box_comparison <- function(exp, explanation, density = F, names = c("1e3", "1e4"
 }
 
 
-
 density_MSR_correlation <- function(exp, explanation, fix = T, windows = c("1e3", "1e4", "1e5", "1e6"))
 {
   
@@ -75,8 +61,25 @@ density_MSR_correlation <- function(exp, explanation, fix = T, windows = c("1e3"
   par(ask=FALSE)
 }
 
+
+show_zone <- function(exp, n)
+{
+  #autocor(exp$data$fragments_infos_array[,3],1)
+  plot(exp$data$fragments_infos_array[1:n,3], col = alpha(1,0.2), ylab = "msr", xlab = "slice number", main = sprintf("%s cell, window size: %d, inverted: %s", exp$name, exp$window_size, exp$inverted))
+  lines(exp$data$fragments_infos_array[1:n,3], col = alpha(1,0.7))
+  par(ask=TRUE)
+  
+  plot(1-exp$data$fragments_infos_array[1:n,2],  col = alpha(1,0.2), ylab = "density", xlab = "slice number", main = sprintf("%s cell, window size: %d", exp$name, exp$window_size))
+  lines(1-exp$data$fragments_infos_array[1:n,2], col= alpha(1,0.7))
+  par(ask=FALSE)
+  
+  cat("\nmean msr: ", mean(exp$data$fragments_infos_array[,3], na.rm=T))
+  cat("\nmean density:", mean(1-exp$data$fragments_infos_array[,2], na.rm=T))
+}
+
 ################################################################################################
 
+par(mfrow=c(2,2))
 density_MSR_correlation(total_exp$`H1_inverted:_FALSE`, "H1")
 box_comparison(total_exp$`H1_inverted:_FALSE`, explanation = "H1", density = T)
 box_comparison(total_exp$`H1_inverted:_FALSE`, explanation = "H1", density = F)
@@ -93,13 +96,67 @@ density_MSR_correlation(total_exp$`stomach_inverted:_TRUE`, "stomach, inverted")
 box_comparison(total_exp$`stomach_inverted:_TRUE`, explanation = "stomach, inverted", density = T)
 box_comparison(total_exp$`stomach_inverted:_TRUE`, explanation = "stomach, inverted", density = F)
 
-density_MSR_correlation(total_exp_fake$`stomach_inverted:_TRUE`, "stomach, inverted")
-box_comparison(total_exp_fake$`stomach_inverted:_TRUE`, explanation = "stomach, inverted", density = T)
-box_comparison(total_exp_fake$`stomach_inverted:_TRUE`, explanation = "stomach, inverted", density = F)
 
-density_MSR_correlation(CG_exp$CG, "CG", windows = c("1e4", "1e5", "1e6", "1e7"), fix = T)
+##### fake data
+density_MSR_correlation(total_exp_fake$`stomach_inverted:_TRUE`, "stomach, inverted")
+box_comparison(total_exp_fake$`stomach_inverted:_TRUE`, explanation = "stomach, inverted fake", density = T)
+box_comparison(total_exp_fake$`stomach_inverted:_TRUE`, explanation = "stomach, inverted fake", density = F)
+######
+
+density_MSR_correlation(CG_exp$CG, "CG", windows = c("1e4", "1e5", "1e6", "1e7"), fix = F)
 box_comparison(CG_exp$CG, explanation = "CG", names = c("1e4", "1e5", "1e6", "1e7"), density = T)
 box_comparison(CG_exp$CG, explanation = "CG", names = c("1e4", "1e5", "1e6", "1e7"), density = F)
+
+#density_MSR_correlation(CG_exp$CG, "CG", windows = c("500"), fix = T)
+#box_comparison(CG_exp$CG, explanation = "CG", names = c("1e4", "1e5", "1e6", "1e7"), density = T)
+#box_comparison(CG_exp$CG, explanation = "CG", names = c("1e4", "1e5", "1e6", "1e7"), density = F)
+
+show_zone(total_exp$`stomach_inverted:_TRUE`[[1]],1000)
+show_zone(total_exp$`H1_inverted:_TRUE`[[1]],1000)
+
+
+
+
+
+
+
+
+
+
+
+
+
+############################################
+CpG_positions <- nucleotides_pattern_positions("chr1", "CG", BSgenome.Hsapiens.UCSC.hg38)
+CpG_densities <- get_CpG_densities(dinucleotides_neighborhood_ranges = c(50,100,300,500,1000,5000),data = data_stomach)
+############################################
+
+
+############################################
+# correlation in methylation patterns ?
+
+bin_h1 = get_methylation_CpG_binary_vector(data_h1,methylation_assigner = standard_binaryzer, missing_read_handler = keep_nas, strands_handler = sum_strands)
+bin_s = get_methylation_CpG_binary_vector(data_stomach,methylation_assigner = standard_binaryzer, missing_read_handler = keep_nas, strands_handler = sum_strands)
+
+# base level 
+table(bin_h1+0, bin_s+0)
+cor.test(bin_h1+0, bin_s+0)
+
+# 1000 basis level
+cor.test(total_exp$`stomach_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2], total_exp$`H1_inverted:_FALSE`[[1]]$data$fragments_infos_array[,2])
+############################################
+
+
+
+
+
+
+
+
+
+
+
+
 #######################################################################################################################
 file_h1 = "../../MethylationCode/MethylationData/wgbs/ENCFF601NBW_H1_cell_line.bed.gz"
 file_stomach = "../../MethylationCode/MethylationData/wgbs/ENCFF844EFX_stomach_man_51.bed.gz"

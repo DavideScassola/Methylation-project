@@ -93,13 +93,6 @@ aggregate <- function(d, bin_size, chromosome, limiter = 99999999)
   })
 }
 
-autocor <- function(v, lag)
-{
-  l = length(v)
-  plot(v[1:(l-lag)],v[(1+lag):l])
-  cor.test(v[1:(l-lag)],v[(1+lag):l])
-}
-
 get_island_ranges <- function(data, min_reads = 2)
 {
   cat("\npreprocessing . . .\n")

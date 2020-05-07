@@ -554,6 +554,13 @@ get_CpG_densities <- function(dinucleotides_neighborhood_ranges, Genome = BSgeno
   return(result)
 }
 
+autocor <- function(v, lag)
+{
+  l = length(v)
+  plot(v[1:(l-lag)],v[(1+lag):l])
+  cor.test(v[1:(l-lag)],v[(1+lag):l])
+}
+
 
 #setwd("./Scrivania/Tesi/MethylationCode/")
 #directory <- "MethylationData/binary_rate/"
