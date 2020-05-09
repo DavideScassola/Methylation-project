@@ -561,6 +561,64 @@ autocor <- function(v, lag)
   cor.test(v[1:(l-lag)],v[(1+lag):l])
 }
 
+random_binary_vector <- function(l, prop)
+{
+  M <- round(l*prop)
+  bin <- array(dim = l, 0)
+  bin[sample(1:l, M)] <- 1
+  return((bin))
+}
+
+sample_msr <- function(l, prop)
+{
+  v <- random_binary_vector(l, prop)
+  rr_v <- calculate_relevance_resolution_vector_ignoring_nas(v, verbose = F)
+  MSR_area(rr_v)
+}
+
+msr_samples <- function(l, prop, sample_size, cores = 1, verbose = F)
+{
+  start_time <- Sys.time()
+  msr_samples = mcmapply(1:sample_size, mc.preschedule = T, mc.cores = cores, FUN =  function(n)
+  {
+    #if(verbose) cat(n, " ")
+    sample_msr(l, prop)
+  })
+  if(verbose) cat("time: ", Sys.time()-start_time)
+  
+  return(msr_samples)
+}
+
+msr_significance_experiment <- function(l,prop_list, samples_size, cores = 1, verbose = F)
+{
+  start_time <- Sys.time()
+  exp = mcmapply(prop_list, mc.preschedule = T, mc.cores = cores, FUN =  function(p)
+  {
+    if(verbose) cat(p, " ")
+    msr_samples(l, p, samples_size, cores = 1, verbose = F)
+  })
+  cat("time: ", Sys.time()-start_time)
+  
+  exp = t(exp)
+  rownames(exp) <- prop_list
+  return(List(data=exp, prop_list=prop_list))
+}
+
+get_msr_ecdf <- function(l, prop, sample_size, cores = 1)
+{
+  return(ecdf(msr_samples(l, prop, sample_size, verbose = F, cores = cores)))
+}
+
+get_msr_ecdfs <- function(l, prop_list, sample_size, cores = 1)
+{
+  sapply(prop_list, function(prop)
+    {
+      if(prop==0 || prop==1) e = NA
+      else e = get_msr_ecdf(l, prop, sample_size, cores = cores)
+      return(List(cdf = e, prop=prop))
+    })
+}
+
 
 #setwd("./Scrivania/Tesi/MethylationCode/")
 #directory <- "MethylationData/binary_rate/"
