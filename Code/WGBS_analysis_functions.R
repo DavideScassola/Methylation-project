@@ -519,3 +519,30 @@ rda_convert <- function(file, new_name)
   system(paste("rm", file))
   gc()
 }
+
+############################################
+# correlation at base level methylation
+base_level_meth_correlation <- function(data1, data2, min_reads = 10)
+{
+  mask = data1$reads>=min_reads & data2$reads>=min_reads
+  p1 = data1[mask, prop]
+  p2 = data2[mask, prop]
+  
+  if(length(p1)<1e5)
+    plot(p1,p2, col=alpha(1, 0.5))
+  print(cor.test(p1,p2))
+  
+  t = table(round(p1/100),round(p2/100))
+  cat("Table:\n")
+  print(t)
+  
+  cat("\n\nproportion table:\n")
+  print(prop.table(t))
+  
+  coherent_sites_prop = prop.table(t)[1] + prop.table(t)[4]
+  cat("\ncoherent_sites_prop: ", coherent_sites_prop)
+  different_sites_num = (t)[2] + (t)[3]
+  cat("\ndifferent_sites_num: ", different_sites_num)
+  
+}
+

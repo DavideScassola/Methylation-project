@@ -12,18 +12,20 @@ data_stomach <- readRDS(file_stomach)
 file_K562 <- "../../MethylationCode/MethylationData/wgbs/K562.Rda"
 data_K562 <- readRDS(file_K562)
 
-file_HeLa <- "../../MethylationCoùde/MethylationData/wgbs/HeLa_S3.Rda"
+file_HeLa <- "../../MethylationCode/MethylationData/wgbs/HeLa_S3.Rda"
 data_HeLa <- readRDS(file_HeLa)
-
-#######################################################################################################
 
 ####################################################
 # MSR EXPERIMENTS ON DIFFERENT WINDOWS
 load(file = "../../Rexperiments/total_exp.Rdata")
+load(file = "../../Rexperiments/total_exp_discrete.Rdata")
 load(file = "../../Rexperiments/total_exp_fake.Rdata")
 load(file = "../../Rexperiments/total_exp_chr1.Rdata")
 load(file = "../../Rexperiments/total_exp_chr1_fake.Rdata")
 load(file = "../../Rexperiments/CG_exp.Rdata")
+
+load("../../Rexperiments/H1_fragments_table.Rdata")
+load("../../Rexperiments/stomach_fragments_table.Rdata")
 #load(file = "../../Rexperiments/CG_exp_small.Rdata")
 ####################################################
 
@@ -96,7 +98,7 @@ density_MSR_correlation <- function(exp, explanation, fix = T, windows = c("1e3"
       plot(density,msr, col = alpha(1,0.5))
     }
     
-    grid()
+    grid(col = alpha("lightgray",0.7))
     
     
     alpha = 1e-5
@@ -159,10 +161,12 @@ experiment_residuals <- function(exp_datas, i)
   exp_data = exp_datas[[i]]
   density= exp_data$data$fragments_infos_array[,2]
   msr = exp_data$data$fragments_infos_array[,3]
-  lm(msr~density)$residuals
+  res = lm(msr~density)$residuals
+  mask = !is.na(density) & !is.na(msr)
+  out = array(dim = length(mask))
+  out[mask] = res
+  return(out)
 }
-
-################################################################################################
 
 get_sig_measures <- function(exp)
 {
@@ -172,20 +176,85 @@ get_sig_measures <- function(exp)
   })
 }
 
-H1_inverted_FALSE_sig <- get_sig_measures(total_exp$`H1_inverted:_FALSE`)
-H1_inverted_TRUE_sig <- get_sig_measures(total_exp$`H1_inverted:_TRUE`)
-stomach_inverted_FALSE_sig <- get_sig_measures(total_exp$`stomach_inverted:_FALSE`)
-stomach_inverted_TRUE_sig <- get_sig_measures(total_exp$`stomach_inverted:_TRUE`)
-
-get_experiment_table <- function(i)
+get_residual_measures <- function(exp)
 {
-  total_exp$`H1_inverted:_FALSE`[[i]]
-  total_exp$`H1_inverted:_TRUE`[[i]]
-  total_exp$`stomach_inverted:_FALSE`[[i]]
-  total_exp$`stomach_inverted:_TRUE`[[i]]
-  
-  expriment_table = List(start=, H1_density=, H1_msr=, H1_inverted_msr=, H1_sig=, H1_inverted_sig=, H1_residual=, H1_inverted_residual=, stomach_density=, stomach_msr=, stomach_inverted_msr=, stomach_sig=, stomach_inverted_sig=, stomach_residual=, stomach_inverted_residual=)
+  lapply(1:4, function(i)
+  {
+    experiment_residuals(exp, i)
+  })
 }
+
+get_experiment_table <- function(Exp, Expi, sig, sigi, res, resi, i)
+{
+  Exp = Exp[[i]]$data$fragments_infos_array
+  Expi = Expi[[i]]$data$fragments_infos_array
+  
+  expriment_table = data.frame(start = Exp[,1],
+                               density = Exp[,2],
+                               msr = Exp[,3], inverted_msr = Expi[,3],
+                               sig = sig[[i]], inverted_sig = sigi[[i]],
+                               residual=res[[i]], inverted_residual=resi[[i]])
+  
+  return(expriment_table)
+}
+
+filter_by_significance <- function(a, alpha=1e-4)
+{
+  significance_mask = !is.na(a$sig) & (a$sig<=alpha | a$sig>=(1-alpha) | a$inverted_sig<=alpha | a$inverted_sig>=(1-alpha))
+  a[significance_mask, ]
+}
+
+show_fragment_info <- function(i, range, data, discretize = F, min_reads = 1)
+{
+  info = data[c(i,i+range), c("chr", "Cpos")]
+  n_of_bases = data$Cpos[i+range]-data$Cpos[i]
+  d = data[i:(i+range)]
+  series = d[reads>=min_reads,prop]
+  
+  if(discretize)
+    series = round(series/100)
+  
+  print(info)
+  cat("n of bases: ", n_of_bases)
+  plot(series)
+}
+
+# macroscopic correlation
+macroscopic_correlation <- function(exp1, exp2, names)
+{
+  windows = c("1e3", "1e4", "1e5", "1e6")
+  
+  for(i in 1:length(windows))
+  {
+    density1= exp1[[i]]$data$fragments_infos_array[,2]
+    msr1 = exp1[[i]]$data$fragments_infos_array[,3]
+    
+    density2= exp2[[i]]$data$fragments_infos_array[,2]
+    msr2 = exp2[[i]]$data$fragments_infos_array[,3]
+    
+    title = paste("densities comaparison", windows[i], "  corr:", round(cor.test(density1, density2)$estimate,2))
+    plot(density1, density2, main = title, xlab = names[1], ylab = names[2])
+    print(cor.test(density1,density2))
+    
+    par(ask=TRUE)
+    
+    title = paste("msr comaparison", windows[i], "  corr:", round(cor.test(msr1, msr2)$estimate,2))
+    plot(msr1, msr2, main = title, xlab = names[1], ylab = names[2])
+    print(cor.test(msr1, msr2))
+    
+  }
+  par(ask=FALSE)
+  
+}
+
+
+
+
+
+
+
+
+
 
 ################################################################################################
 
@@ -224,51 +293,24 @@ box_comparison(CG_exp$CG, explanation = "CG", names = c("1e4", "1e5", "1e6", "1e
 show_zone(total_exp$`stomach_inverted:_TRUE`[[1]],1000)
 show_zone(total_exp$`H1_inverted:_TRUE`[[1]],1000)
 
-######################################################
 
-# macroscopic correlation
-macroscopic_correlation <- function(exp1, exp2, names)
-{
-  windows = c("1e3", "1e4", "1e5", "1e6")
-  
-  for(i in 1:length(windows))
-  {
-    density1= exp1[[i]]$data$fragments_infos_array[,2]
-    msr1 = exp1[[i]]$data$fragments_infos_array[,3]
-    
-    density2= exp2[[i]]$data$fragments_infos_array[,2]
-    msr2 = exp2[[i]]$data$fragments_infos_array[,3]
-    
-    title = paste("densities comaparison", windows[i], "  corr:", round(cor.test(density1, density2)$estimate,2))
-    plot(density1, density2, main = title, xlab = names[1], ylab = names[2])
-    print(cor.test(density1,density2))
-    
-    par(ask=TRUE)
-    
-    title = paste("msr comaparison", windows[i], "  corr:", round(cor.test(msr1, msr2)$estimate,2))
-    plot(msr1, msr2, main = title, xlab = names[1], ylab = names[2])
-    print(cor.test(msr1, msr2))
-  
-  }
-  par(ask=FALSE)
-  
-}
+######################################################################
 
 
-macroscopic_correlation(total_exp$`H1_inverted:_FALSE`, total_exp$`stomach_inverted:_FALSE`, names)
-###################################################################
 
-############################################
-# correlation at base level methylation
 
-data_H1 = sum_strands(data_H1)
-data_stomach = sum_strands(data_stomach)
-min_reads = 5
-mask = data_H1$reads>=min_reads & data_stomach$reads>=min_reads
-p1 = data_H1[mask, prop]
-p2 = data_stomach[mask, prop]
-cor.test(p1,p2)
-############################################
+macroscopic_correlation(total_exp$`H1_inverted:_FALSE`, total_exp$`stomach_inverted:_FALSE`, names=c("H1", "stomach"))
+
+base_level_meth_correlation(data_H1, data_stomach)
+
+
+
+
+
+
+
+
+
 
 
 ############################################
@@ -357,6 +399,36 @@ offset <- 1e7
 rr_scales_stochastic_genomewide <- different_scales_experiment_genomewide(List(data_h1,data_stomach), size_list_rid, offset = offset, names = c("h1", "stomach"),chromosome = "chr1", methylation_assigner = stochastic_binaryzer)
 rr_plots(rr_scales_stochastic_genomewide[[1]], legend_names = size_list_rid, title = "different scales experiment, stochastic assignment, chr1, h1 cells, on genome, starting from base 1e7")
 
+
+
+###################################################################################
+
+dH1_inverted_FALSE_sig <- get_sig_measures(total_exp_discrete$`H1_inverted:_FALSE`)
+dH1_inverted_TRUE_sig <- get_sig_measures(total_exp_discrete$`H1_inverted:_TRUE`)
+dstomach_inverted_FALSE_sig <- get_sig_measures(total_exp_discrete$`stomach_inverted:_FALSE`)
+dstomach_inverted_TRUE_sig <- get_sig_measures(total_exp_discrete$`stomach_inverted:_TRUE`)
+
+dH1_inverted_FALSE_res <- get_residual_measures(total_exp_discrete$`H1_inverted:_FALSE`)
+dH1_inverted_TRUE_res <- get_residual_measures(total_exp_discrete$`H1_inverted:_TRUE`)
+dstomach_inverted_FALSE_res <- get_residual_measures(total_exp_discrete$`stomach_inverted:_FALSE`)
+dstomach_inverted_TRUE_res <- get_residual_measures(total_exp_discrete$`stomach_inverted:_TRUE`)
+
+
+
+H1_fragments_table_discrete = lapply(1:4, function(i)
+{
+  get_experiment_table(total_exp_discrete$`H1_inverted:_FALSE`, total_exp_discrete$`H1_inverted:_TRUE`, dH1_inverted_FALSE_sig, dH1_inverted_TRUE_sig, dH1_inverted_FALSE_res, dH1_inverted_TRUE_res, i)
+})
+
+stomach_fragments_table_discrete = lapply(1:4, function(i)
+{
+  get_experiment_table(total_exp_discrete$`stomach_inverted:_FALSE`, total_exp_discrete$`stomach_inverted:_TRUE`, dstomach_inverted_FALSE_sig, dstomach_inverted_TRUE_sig, dstomach_inverted_FALSE_res, dstomach_inverted_TRUE_res, i)
+})
+
+save(H1_fragments_table_discrete, file = "../../Rexperiments/H1_fragments_table_discrete.Rdata")
+save(stomach_fragments_table_discrete, file = "../../Rexperiments/stomach_fragments_table_discrete.Rdata")
+
+##############################################################################################
 
 
 
