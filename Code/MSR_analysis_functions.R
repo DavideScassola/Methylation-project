@@ -619,6 +619,38 @@ get_msr_ecdfs <- function(l, prop_list, sample_size, cores = 1)
     })
 }
 
+inverse = function(f, lower = -100, upper = 100) {
+  function (y) uniroot((function (x) f(x) - y), lower = lower, upper = upper)[1]$root
+}
+
+msr_confidence_line <- function(ecdfs, confidence = 0.99)
+{
+  sapply(ecdfs, function(f)
+    {
+    if( f$prop==0 || f$prop==1) return(c(f$prop,NA))
+    c(f$prop, inverse(f$cdf, 0, 0.4)(confidence))
+  })
+}
+
+add_msr_confidence_line <- function(ecdfs, confidence = 0.99, col = 1, lty = 2)
+{
+  conf = msr_confidence_line(ecdfs, confidence)
+  lines(conf[1,], conf[2,], col=col, lty=lty)
+}
+
+general_msr_cdf <- function(ecdfs, density, msr)
+{
+  for( i in 1:length(ecdfs))
+  {
+    if(density>= ecdfs[[i]]$prop & density<= ecdfs[[i+1]]$prop)
+    {
+      dist1 = density - ecdfs[[i]]$prop
+      dist2 = ecdfs[[i+1]]$prop - density
+      w = dist1/(dist1+dist2)
+      return(ecdfs[[i]]$cdf(msr)*(1-w)+(w)*ecdfs[[i+1]]$cdf(msr))
+    }
+  }
+}
 
 #setwd("./Scrivania/Tesi/MethylationCode/")
 #directory <- "MethylationData/binary_rate/"

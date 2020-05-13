@@ -47,13 +47,31 @@ sum_strands <- function(data, verbose = T)
   return(unstranded_data)
 }
 
+ordered_data  <- function(data)
+{
+  separated = lapply(chromosomes(), function(c)
+  {
+    data[chr == c]
+  })
+  
+  ordered = separated[[1]]
+  for(i in 2:length(separated))
+  {
+    ordered = rbind(ordered, separated[[i]])
+  }
+  
+  return(ordered)
+  
+}
+
+
 read_ENCODE_bed <- function(file, chromosome = "all", verbose = T)
 {
   data <- fread(cmd=sprintf("zcat < %s",file), verbose=F, showProgress=verbose, select = c(1,2,6,10,11), stringsAsFactors = T)
   colnames(data) <- c("chr","Cpos", "strand", "reads", "prop")
   if(chromosome=="all")
   {
-    return(droplevels(data[(chr %in% chromosomes()),]))
+    return(ordered_data(droplevels(data[(chr %in% chromosomes()),])))
   }
   else return(data[chr==chromosome, -c(1)])
 }
@@ -494,5 +512,10 @@ total_spatial_experiment_for_dinucleotides_locations_by_chromosome <- function(p
   return(result)
 }
 
-
-
+rda_convert <- function(file, new_name)
+{
+  data <- read_ENCODE_bed(file, verbose = T)
+  saveRDS(data, file = new_name)
+  system(paste("rm", file))
+  gc()
+}
