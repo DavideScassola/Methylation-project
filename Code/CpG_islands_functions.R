@@ -1,4 +1,4 @@
-setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
+#setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
 source("WGBS_analysis_functions.R", chdir = T)
 
 # HOW TO GENERATE CPG ISL DATA
