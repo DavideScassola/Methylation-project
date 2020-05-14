@@ -546,3 +546,58 @@ base_level_meth_correlation <- function(data1, data2, min_reads = 10)
   
 }
 
+
+compare_meth_sites_histograms <- function(names, min_reads = 1, ...)
+{
+  i = 1
+  for( d in list(...))
+  {
+    p = d$prop[(d[,reads])>=min_reads]
+    hist(p, main = paste(names[i], ": methylation proportion on single sites,", "mean: ", round(mean(p, na.rm = T), 2)), probability = T, ylim = c(0, 0.12), xlab = "methylation level")
+    i = i + 1
+    par(ask=TRUE)
+  }
+  
+  par(ask=FALSE)
+  
+}
+
+compare_meth_annotation_histograms <- function(names, reads_name = "reads", min_reads = 1, title = "", ...)
+{
+  i = 1
+  for( d in list(...))
+  {
+    p = d$prop[d[,reads_name]>=min_reads]
+    hist(p, main = paste(names[i], title, " mean: ", round(mean(p, na.rm = T), 2)), probability = T, ylim = c(0, 0.12), xlab = "methylation level")
+    i = i + 1
+    par(ask=TRUE)
+  }
+  
+  par(ask=FALSE)
+  
+}
+
+annotation_level_meth_correlation <- function(data1, data2, reads_name, min_reads = 10)
+{
+  mask = data1[, reads_name]>=min_reads & data2[, reads_name]>=min_reads
+  p1 = data1[mask, "prop"]
+  p2 = data2[mask, "prop"]
+  
+  if(length(p1)<1e5)
+    plot(p1,p2, col=alpha(1, 0.5))
+  print(cor.test(p1,p2))
+  
+  t = table(round(p1/100),round(p2/100))
+  cat("Table:\n")
+  print(t)
+  
+  cat("\n\nproportion table:\n")
+  print(prop.table(t))
+  
+  coherent_sites_prop = prop.table(t)[1] + prop.table(t)[4]
+  cat("\ncoherent_sites_prop: ", coherent_sites_prop)
+  different_sites_num = (t)[2] + (t)[3]
+  cat("\ndifferent_sites_num: ", different_sites_num)
+  
+}
+

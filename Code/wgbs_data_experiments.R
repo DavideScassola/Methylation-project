@@ -26,6 +26,8 @@ load(file = "../../Rexperiments/CG_exp.Rdata")
 
 load("../../Rexperiments/H1_fragments_table.Rdata")
 load("../../Rexperiments/stomach_fragments_table.Rdata")
+load("../../Rexperiments/H1_fragments_table_discrete.Rdata")
+load("../../Rexperiments/stomach_fragments_table_discrete.Rdata")
 #load(file = "../../Rexperiments/CG_exp_small.Rdata")
 ####################################################
 
@@ -44,21 +46,6 @@ data_H1 = sum_strands(data_H1)
 data_HeLa = sum_strands(data_HeLa)
 data_stomach = sum_strands(data_stomach)
 gc(full=T)
-
-compare_meth_sites_histograms <- function(names, min_reads = 1, ...)
-{
-  i = 1
-  for( d in list(...))
-  {
-    p = d$prop[d$reads>=min_reads]
-    hist(p, main = paste(names[i], ": methylation proportion on single sites,", "mean: ", round(mean(p, na.rm = T), 2)), probability = T, ylim = c(0, 0.12))
-    i = i + 1
-    par(ask=TRUE)
-  }
-  
-  par(ask=FALSE)
-
-}
 
 ########################################################
 
@@ -204,7 +191,33 @@ filter_by_significance <- function(a, alpha=1e-4)
   a[significance_mask, ]
 }
 
-show_fragment_info <- function(i, range, data, discretize = F, min_reads = 1)
+show_fragment_info2 <- function(i, range, data, table, discretize = F, min_reads = 1)
+{
+
+  density = round(table[i, "density"],2)
+  msr = round(table[i, "msr"],2)
+  sig = round(table[i, "sig"],6)
+  inverted_msr = round(table[i, "inverted_msr"],2)
+  inverted_sig = round(table[i, "inverted_sig"],6)
+  main = sprintf("density: %s\n msr: %s, msr_cdf: %s \n inv_msr: %s, inv_msr_cdf: %s", density, msr, sig, inverted_msr, inverted_sig)
+  
+  i = table[i, "start"]
+  
+  info = data[c(i,i+range), c("chr", "Cpos")]
+  n_of_bases = data$Cpos[i+range]-data$Cpos[i]
+  d = data[i:(i+range)]
+  series = d[reads>=min_reads,prop]
+  
+  if(discretize)
+    series = round(series/100)
+  
+  print(info)
+  cat("n of bases: ", n_of_bases)
+
+  plot(series, ylab="prop", main = main)
+}
+
+show_fragment_info1 <- function(i, range, data, table, discretize = F, min_reads = 1)
 {
   info = data[c(i,i+range), c("chr", "Cpos")]
   n_of_bases = data$Cpos[i+range]-data$Cpos[i]
@@ -216,7 +229,19 @@ show_fragment_info <- function(i, range, data, discretize = F, min_reads = 1)
   
   print(info)
   cat("n of bases: ", n_of_bases)
-  plot(series)
+  
+  
+  row = table[table$start==i, ]
+  density = round(row[, "density"],2)
+  msr = round(row[, "msr"],2)
+  sig = round(row[, "sig"],5)
+  inverted_msr = round(row[, "inverted_msr"],2)
+  inverted_sig = round(row[, "inverted_sig"],5)
+  main = sprintf("density: %s\n msr: %s, msr_cdf: %s \n inv_msr: %s, inv_msr_cdf: %s", density, msr, sig, inverted_msr, inverted_sig)
+  
+  i = table[i, "start"]
+  
+  plot(series, ylab="prop", main = main)
 }
 
 # macroscopic correlation
@@ -258,7 +283,7 @@ macroscopic_correlation <- function(exp1, exp2, names)
 
 ################################################################################################
 
-par(mfrow=c(1,1))
+par(mfrow=c(3,1))
 density_MSR_correlation(total_exp$`H1_inverted:_FALSE`, "H1", fix = T)
 box_comparison(total_exp$`H1_inverted:_FALSE`, explanation = "H1", density = T)
 box_comparison(total_exp$`H1_inverted:_FALSE`, explanation = "H1", density = F)
@@ -294,6 +319,11 @@ show_zone(total_exp$`stomach_inverted:_TRUE`[[1]],1000)
 show_zone(total_exp$`H1_inverted:_TRUE`[[1]],1000)
 
 
+density_MSR_correlation(total_exp_discrete$`H1_inverted:_FALSE`, "H1", fix = T)
+
+density_MSR_correlation(total_exp_discrete$`H1_inverted:_TRUE`, "H1, inverted")
+
+
 ######################################################################
 
 
@@ -301,7 +331,7 @@ show_zone(total_exp$`H1_inverted:_TRUE`[[1]],1000)
 
 macroscopic_correlation(total_exp$`H1_inverted:_FALSE`, total_exp$`stomach_inverted:_FALSE`, names=c("H1", "stomach"))
 
-base_level_meth_correlation(data_H1, data_stomach)
+
 
 
 
@@ -432,4 +462,75 @@ save(stomach_fragments_table_discrete, file = "../../Rexperiments/stomach_fragme
 
 
 
+# 13 middle density, significant
+# 17, 28, 30, 32, 36
 
+# middle, not sign 
+# 33
+
+# standard density, not significant
+# 19,  57
+
+# standard density, significant
+# 34, 48, 47
+# 56, 94 <----------
+
+# low not
+# 82
+
+d = H1_fragments_table[[1]][!is.na(H1_fragments_table[[1]]$msr),]
+
+middle_density = (d$density-0.5)<0.1
+low_density = (d$density)<0.4
+normal_density = (d$density)>0.75
+high_sig_high = (d$sig)>=1-(1e-5)
+high_sig_low = (d$sig)<=1e-5
+normal_sig = abs(d$sig-0.5)<=0.2
+high_sig = high_sig_high & high_sig_low
+
+#high sig, low density
+# 6274001, 18249001
+
+
+d[high_sig_low & middle_density, ]
+# 0 sig, middle density
+# 298001, 859001
+show_fragment_info1(859001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+
+d[normal_sig & middle_density, ]
+# 0.5 sig, middle density
+# 20038001, 2598001
+show_fragment_info1(2598001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+
+d[high_sig_high & middle_density, ]
+# 1 sig, middle density
+# 6274001 # molto raro
+show_fragment_info1(6274001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+
+
+
+
+d[normal_sig & normal_density, ]
+# 0.5 sig, high density
+# 172001, 431001
+show_fragment_info1(431001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+
+
+d[high_sig_high & normal_density, ]
+# 1 sig, high density
+# 26146001, 24201001
+show_fragment_info1(24201001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+
+
+d[high_sig_low & normal_density, ]
+# 0 sig, high density
+# 43001, 10857001
+show_fragment_info1(10857001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+
+
+sample_fragment_plots <- function(n, data, table, discretize = F, min_reads = 3, range = 1e3)
+{
+  s = sample(x = 1:length(table$start), size = n, replace = F)
+  for(i in s)
+    show_fragment_info2(i, range, data, table, F, 3)
+}

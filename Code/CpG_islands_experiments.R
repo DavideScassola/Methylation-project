@@ -1,6 +1,7 @@
 
 setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
 load("../../MethylationCode/MethylationData/CpGislands.Rdata")
+load("../../MethylationCode/MethylationData/Enhancers.Rdata")
 source("CpG_islands_functions.R", chdir = T)
 
 ###################################################################
@@ -13,8 +14,8 @@ HeLa_islands    = readRDS("../../Rexperiments/HeLa_S3_island_data.Rda")
 names = c("H1", "Stomach")
 data = List(H1_islands, stomach_islands)
 
-names = c("HeLa", "Stomach")
-data = List(HeLa_islands, stomach_islands)
+names = c("H1", "K562")
+data = List(H1_islands, K562_islands)
 
 # correlation study
 cor.test(data[[1]]$prop, data[[2]]$prop)
@@ -37,18 +38,18 @@ cat("different_sites_num: ", different_sites_num)
 ######################################################################
 # Methylation heterogeneity
 
-colors = c(alpha(10,0.5), alpha(5,0.5))
+colors = c(alpha(5,0.5), alpha(7,0.5))
 
 breaks = 40
 min_valid_sites = 10
 hist(data[[1]]$prop[data[[1]]$`valid sites`>min_valid_sites], col = colors[1], probability = T, breaks = breaks, xlab = "methylation level", main = ("Methylation level on CpG islands"))
 hist(data[[2]]$prop[data[[2]]$`valid sites`>min_valid_sites], col = colors[2], probability = T, add = T, breaks = breaks)
-legend("top", legend=names, col=colors, fill = colors)
+legend("topright", legend=names, col=colors, fill = colors, cex = 0.75)
 
 breaks = 4
 hist(data[[1]]$prop[data[[1]]$`valid sites`>min_valid_sites], col = colors[1], probability = T, breaks = breaks, xlab = "methylation level", main = ("Methylation level on CpG islands"))
 hist(data[[2]]$prop[data[[2]]$`valid sites`>min_valid_sites], col = colors[2], probability = T, breaks = breaks, add = T)
-legend("top", legend=names, col=colors, fill = colors)
+legend("topright", legend=names, col=colors, fill = colors, cex = 0.75)
 
 ######################################################################
 

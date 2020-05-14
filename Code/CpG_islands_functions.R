@@ -107,4 +107,33 @@ aggregate <- function(d, bin_size, chromosome, limiter = 99999999)
   })
 }
 
+add_wgbs_indexes <- function(Annotations_dataframe, wgbs_data, cores = 1)
+{
+  wgbs_data = sum_strands(wgbs_data)
+  data_scheme <- (wgbs_data)[, c("chr","Cpos")]
+  l = length(Annotations_dataframe$start)
+  
+  wgbs_chr = as.character(data_scheme$chr)
+  anno_chr = as.character(Annotations_dataframe$chr)
+  ranges = mcmapply(1:l, mc.preschedule = T, mc.cores = cores, FUN =  function(n)
+  {
+    cat(n," ")
+    chr_mask = (wgbs_chr==(anno_chr[n]))
+    indexes = which(chr_mask & data_scheme$Cpos>=Annotations_dataframe$start[n]  & data_scheme$Cpos<=Annotations_dataframe$end[n])
+    i_start = min(indexes)
+    i_end = max(indexes )
+    return(c(i_start, i_end))
+    })
+  
+  r = data.frame(t(ranges))
+  colnames(r) <- c("i_start", "i_end")
+  print(r)
+  
+  out = cbind(Annotations_dataframe, i_start = r$i_start, i_end = r$i_end)
+  gc()
+  return(out)
+  
+}
+
+
 
