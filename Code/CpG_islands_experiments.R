@@ -54,6 +54,22 @@ legend("topright", legend=names, col=colors, fill = colors, cex = 0.75)
 ######################################################################
 
 
+nice_histogram_comparison <- function(data1, data2, min_sites = 10, name1, name2, col1, col2, xlab, main)
+{
+  colors = c(alpha(5,0.5), alpha(7,0.5))
+  
+  breaks = 40
+  min_valid_sites = 10
+  hist(data[[1]]$prop[data[[1]]$`valid sites`>min_valid_sites], col = colors[1], probability = T, breaks = breaks, xlab = "methylation level", main = ("Methylation level on CpG islands"))
+  hist(data[[2]]$prop[data[[2]]$`valid sites`>min_valid_sites], col = colors[2], probability = T, add = T, breaks = breaks)
+  legend("topright", legend=names, col=colors, fill = colors, cex = 0.75)
+  
+  breaks = 4
+  hist(data[[1]]$prop[data[[1]]$`valid sites`>min_valid_sites], col = colors[1], probability = T, breaks = breaks, xlab = "methylation level", main = ("Methylation level on CpG islands"))
+  hist(data[[2]]$prop[data[[2]]$`valid sites`>min_valid_sites], col = colors[2], probability = T, breaks = breaks, add = T)
+  legend("topright", legend=names, col=colors, fill = colors, cex = 0.75)
+}
+
 
 
 file_stomach = "../../MethylationCode/MethylationData/wgbs/ENCFF844EFX_stomach_man_51.bed.gz"

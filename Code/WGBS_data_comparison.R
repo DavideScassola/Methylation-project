@@ -8,7 +8,7 @@ data_K562 <- sum_strands(readRDS("../../MethylationCode/MethylationData/wgbs/K56
 data_HeLa <- sum_strands(readRDS("../../MethylationCode/MethylationData/wgbs/HeLa_S3.Rda"))
 gc(full=T)
 
-names = c("H1", "stomach", "HeLa_S3", "K562")
+names = c("H1", "stomach", "HeLa-S3", "K562")
 data_list = List(data_H1, data_stomach, data_HeLa, data_K562)
 ####################################################
 
@@ -20,10 +20,10 @@ HeLa_islands    = readRDS("../../Rexperiments/HeLa_S3_island_data.Rda")
 #####################################################################
 
 ###################################################################
-H1_enhanceers      = readRDS("../../Rexperiments/H1_enhanceers_data.Rda")
-stomach_enhanceers = readRDS("../../Rexperiments/stomach_enhanceers_data.Rda")
-K562_enhanceers    = readRDS("../../Rexperiments/K562_enhanceers_data.Rda")
-HeLa_enhanceers    = readRDS("../../Rexperiments/HeLa_S3_enhanceers_data.Rda")
+H1_enhancers      = readRDS("../../Rexperiments/H1_enhancers_data.Rda")
+stomach_enhancers = readRDS("../../Rexperiments/stomach_enhancers_data.Rda")
+K562_enhancers    = readRDS("../../Rexperiments/K562_enhancers_data.Rda")
+HeLa_enhancers    = readRDS("../../Rexperiments/HeLa_S3_enhancers_data.Rda")
 #####################################################################
 
 # BASE LEVEL
@@ -69,16 +69,17 @@ annotation_level_meth_correlation(H1_islands, K562_islands,    reads_name = "val
 # ENHANCERS LEVEL
 
 # Histograms
-compare_meth_annotation_histograms(names, reads_name = "valid sites", title = "Enhancers methylation", min_reads = 10, H1_enhancers, stomach_enhancers, HeLa_enhancers, K562_enhancers)
+par(mfrow=c(1,1))
+compare_meth_annotation_histograms(names, reads_name = "valid sites", title = "Enhancers methylation", min_reads = 5, y_max = 0.08, H1_enhancers, stomach_enhancers, HeLa_enhancers, K562_enhancers)
 
 # Correlation
-min_reads = 10
-annotation_level_meth_correlation(H1_enhancers, stomach_enhancers, reads_name = "valid sites", min_reads)
+min_reads = 5
+annotation_level_meth_correlation(H1_enhancers, stomach_enhancers, reads_name = "valid sites", min_reads, names = c("H1", "stomach"))
 annotation_level_meth_correlation(H1_enhancers, HeLa_enhancers,    reads_name = "valid sites", min_reads)
 annotation_level_meth_correlation(H1_enhancers, K562_enhancers,    reads_name = "valid sites", min_reads)
 
 ##### island level correlation
 #             Corr       coherence
-# H1-stomach: 
-# H1-Hela_S3: 
-# H1-K562:    
+# H1-stomach: 0.527691   0.8009343
+# H1-Hela_S3: 0.2983441  0.7712936
+# H1-K562:    0.1993023  0.3655242

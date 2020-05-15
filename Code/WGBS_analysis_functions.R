@@ -562,13 +562,14 @@ compare_meth_sites_histograms <- function(names, min_reads = 1, ...)
   
 }
 
-compare_meth_annotation_histograms <- function(names, reads_name = "reads", min_reads = 1, title = "", ...)
+compare_meth_annotation_histograms <- function(names, reads_name = "reads", min_reads = 1, y_max = 0.12, title = "", ...)
 {
   i = 1
   for( d in list(...))
   {
     p = d$prop[d[,reads_name]>=min_reads]
-    hist(p, main = paste(names[i], title, " mean: ", round(mean(p, na.rm = T), 2)), probability = T, ylim = c(0, 0.12), xlab = "methylation level")
+    main = paste(names[i], title, " mean: ", round(mean(p, na.rm = T), 2))
+    hist(p, main = main, probability = T, ylim = c(0, y_max), xlab = "methylation level")
     i = i + 1
     par(ask=TRUE)
   }
@@ -577,14 +578,12 @@ compare_meth_annotation_histograms <- function(names, reads_name = "reads", min_
   
 }
 
-annotation_level_meth_correlation <- function(data1, data2, reads_name, min_reads = 10)
+annotation_level_meth_correlation <- function(data1, data2, reads_name, min_reads = 10, names)
 {
   mask = data1[, reads_name]>=min_reads & data2[, reads_name]>=min_reads
   p1 = data1[mask, "prop"]
   p2 = data2[mask, "prop"]
   
-  if(length(p1)<1e5)
-    plot(p1,p2, col=alpha(1, 0.5))
   print(cor.test(p1,p2))
   
   t = table(round(p1/100),round(p2/100))
@@ -598,6 +597,14 @@ annotation_level_meth_correlation <- function(data1, data2, reads_name, min_read
   cat("\ncoherent_sites_prop: ", coherent_sites_prop)
   different_sites_num = (t)[2] + (t)[3]
   cat("\ndifferent_sites_num: ", different_sites_num)
+  
+  if(length(p1)<1e5)
+  {
+    plot(p1,p2, col=alpha(1, 0.5), xlab = names[1], ylab = names[2], main = sprintf("correlation: %s, coherence: %s", round(cor.test(p1,p2)$estimate,2), round(coherent_sites_prop,2)))
+    lines(x = c(-100,200), y = c(50,50), lty = 2, col = 2)
+    lines(x = c(50,50), y = c(-100,200), lty = 2, col = 2)
+  }
+
   
 }
 
