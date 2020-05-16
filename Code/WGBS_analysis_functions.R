@@ -578,7 +578,7 @@ compare_meth_annotation_histograms <- function(names, reads_name = "reads", min_
   
 }
 
-annotation_level_meth_correlation <- function(data1, data2, reads_name, min_reads = 10, names)
+annotation_level_meth_correlation <- function(data1, data2, reads_name, min_reads = 10, names, main)
 {
   mask = data1[, reads_name]>=min_reads & data2[, reads_name]>=min_reads
   p1 = data1[mask, "prop"]
@@ -600,7 +600,7 @@ annotation_level_meth_correlation <- function(data1, data2, reads_name, min_read
   
   if(length(p1)<1e5)
   {
-    plot(p1,p2, col=alpha(1, 0.5), xlab = names[1], ylab = names[2], main = sprintf("correlation: %s, coherence: %s", round(cor.test(p1,p2)$estimate,2), round(coherent_sites_prop,2)))
+    plot(p1,p2, col=alpha(1, 0.5), xlab = names[1], ylab = names[2], main = sprintf("%s correlation: %s, coherence: %s", main, round(cor.test(p1,p2)$estimate,2), round(coherent_sites_prop,2)))
     lines(x = c(-100,200), y = c(50,50), lty = 2, col = 2)
     lines(x = c(50,50), y = c(-100,200), lty = 2, col = 2)
   }

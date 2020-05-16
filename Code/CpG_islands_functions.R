@@ -127,13 +127,12 @@ add_wgbs_indexes <- function(Annotations_dataframe, wgbs_data, cores = 1)
   
   r = data.frame(t(ranges))
   colnames(r) <- c("i_start", "i_end")
-  print(r)
+  #print(r)
   
   out = cbind(Annotations_dataframe, i_start = r$i_start, i_end = r$i_end)
   gc()
-  return(out)
+  return(out[order(out$i_start)])
   
 }
 
-
-
+#########################################

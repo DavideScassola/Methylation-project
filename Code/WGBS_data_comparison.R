@@ -53,9 +53,9 @@ compare_meth_annotation_histograms(names, reads_name = "valid sites", title = "C
 
 # Correlation
 min_reads = 10
-annotation_level_meth_correlation(H1_islands, stomach_islands, reads_name = "valid sites", min_reads=100)
-annotation_level_meth_correlation(H1_islands, HeLa_islands,    reads_name = "valid sites", min_reads=100)
-annotation_level_meth_correlation(H1_islands, K562_islands,    reads_name = "valid sites", min_reads=100)
+annotation_level_meth_correlation(H1_islands, stomach_islands, reads_name = "valid sites", min_reads=100, names = c("H1", "stomach"), main = "CG islands: ")
+annotation_level_meth_correlation(H1_islands, HeLa_islands,    reads_name = "valid sites", min_reads=100, names = c("H1", "HeLa-S3"), main = "CG islands: ")
+annotation_level_meth_correlation(H1_islands, K562_islands,    reads_name = "valid sites", min_reads=100, names = c("H1", "K562"), main = "CG islands: ")
 
 ##### island level correlation
 #             Corr       coherence
@@ -69,14 +69,14 @@ annotation_level_meth_correlation(H1_islands, K562_islands,    reads_name = "val
 # ENHANCERS LEVEL
 
 # Histograms
-par(mfrow=c(1,1))
+par(mfrow=c(2,2))
 compare_meth_annotation_histograms(names, reads_name = "valid sites", title = "Enhancers methylation", min_reads = 5, y_max = 0.08, H1_enhancers, stomach_enhancers, HeLa_enhancers, K562_enhancers)
 
 # Correlation
 min_reads = 5
-annotation_level_meth_correlation(H1_enhancers, stomach_enhancers, reads_name = "valid sites", min_reads, names = c("H1", "stomach"))
-annotation_level_meth_correlation(H1_enhancers, HeLa_enhancers,    reads_name = "valid sites", min_reads)
-annotation_level_meth_correlation(H1_enhancers, K562_enhancers,    reads_name = "valid sites", min_reads)
+annotation_level_meth_correlation(H1_enhancers, stomach_enhancers, reads_name = "valid sites", min_reads, names = c("H1", "stomach"), main = "Enhancers: ")
+annotation_level_meth_correlation(H1_enhancers, HeLa_enhancers,    reads_name = "valid sites", min_reads, names = c("H1", "HeLa-S3"), main = "Enhancers: ")
+annotation_level_meth_correlation(H1_enhancers, K562_enhancers,    reads_name = "valid sites", min_reads, names = c("H1", "K562"), main = "Enhancers: ")
 
 ##### island level correlation
 #             Corr       coherence
