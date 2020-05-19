@@ -16,6 +16,14 @@ source("WGBS_analysis_functions.R", chdir = T)
 #save(file = "../../MethylationCode/MethylationData/Enhancers.Rdata", Enhancers)
 ############################################################
 
+############################################################
+file = "../../MethylationCode/MethylationData/genebody.bed"
+anno <- fread(file = file,verbose=F, showProgress=T, stringsAsFactors = T)
+anno$chr <- to_chr_factor(anno$chr)
+#colnames(CpGislands) <- c("bin","chr", "start", "end", "name", "length", "cpgNum", "gcNum", "perCpG", "perGc", "obsExp")
+#save(file = "../../MethylationCode/MethylationData/Enhancers.Rdata", Enhancers)
+############################################################
+
 to_chr_factor <- Vectorize(function(chr_number)
 {
   paste("chr", as.character(chr_number), sep="")
@@ -86,7 +94,7 @@ annotation_regions_meth_data <- function(data, annotation_region_meth_counter, A
     
     r = data.frame(t(methylation_prop))
     colnames(r) <- c("prop", "meth count", "valid sites")
-    r = cbind(r, id=Annotations_dataframe$id)
+    #r = cbind(r, id=Annotations_dataframe$id)
     gc()
     return(r)
 }
@@ -113,13 +121,18 @@ add_wgbs_indexes <- function(Annotations_dataframe, wgbs_data, cores = 1)
   data_scheme <- (wgbs_data)[, c("chr","Cpos")]
   l = length(Annotations_dataframe$start)
   
-  wgbs_chr = as.character(data_scheme$chr)
-  anno_chr = as.character(Annotations_dataframe$chr)
-  ranges = mcmapply(1:l, mc.preschedule = T, mc.cores = cores, FUN =  function(n)
+  anno = Annotations_dataframe[Annotations_dataframe$chr %in% levels(data_scheme$chr[1])]
+  anno$chr = factor(anno$chr)
+
+  wgbs_chr = (data_scheme$chr)
+  anno_chr = anno$chr
+  anno_start = anno$start
+  anno_end = anno$end
+  ranges = mcmapply(1:l, mc.preschedule = F, mc.cores = cores, FUN =  function(n)
   {
     cat(n," ")
-    chr_mask = (wgbs_chr==(anno_chr[n]))
-    indexes = which(chr_mask & data_scheme$Cpos>=Annotations_dataframe$start[n]  & data_scheme$Cpos<=Annotations_dataframe$end[n])
+    chr_mask = wgbs_chr==as.character(anno_chr[n])
+    indexes = which(chr_mask & data_scheme$Cpos>=anno_start[n]  & data_scheme$Cpos<=anno_end[n])
     i_start = min(indexes)
     i_end = max(indexes )
     return(c(i_start, i_end))
@@ -129,10 +142,23 @@ add_wgbs_indexes <- function(Annotations_dataframe, wgbs_data, cores = 1)
   colnames(r) <- c("i_start", "i_end")
   #print(r)
   
-  out = cbind(Annotations_dataframe, i_start = r$i_start, i_end = r$i_end)
+  out = cbind(anno, i_start = r$i_start, i_end = r$i_end)
   gc()
   return(out[order(out$i_start)])
   
 }
 
 #########################################
+
+
+from_bed_to_annotation_with_wgbs_indexes <- function(bed_file, wgbs_data_file, cores = 1)
+{
+  wgbs_data = read_ENCODE_bed(wgbs_data_file)
+  anno <- fread(file = bed_file,verbose=F, showProgress=T, stringsAsFactors = T)
+  anno$chr <- to_chr_factor(anno$chr)
+  
+  anno_improved = add_wgbs_indexes(anno, wgbs_data, cores)
+  new_name = paste(substring(bed_file, 1, nchar(bed_file)-4), "_improved.Rda", sep = "")
+  saveRDS(anno, file = new_name)
+}
+

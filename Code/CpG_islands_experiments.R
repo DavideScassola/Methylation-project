@@ -2,6 +2,7 @@
 setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
 load("../../MethylationCode/MethylationData/CpGislands.Rdata")
 load("../../MethylationCode/MethylationData/Enhancers.Rdata")
+Enhancers = readRDS("../../Rexperiments/Enhancers_with_indexes.Rda")
 source("CpG_islands_functions.R", chdir = T)
 
 ###################################################################
