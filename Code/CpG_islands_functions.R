@@ -16,13 +16,6 @@ source("WGBS_analysis_functions.R", chdir = T)
 #save(file = "../../MethylationCode/MethylationData/Enhancers.Rdata", Enhancers)
 ############################################################
 
-############################################################
-file = "../../MethylationCode/MethylationData/genebody.bed"
-anno <- fread(file = file,verbose=F, showProgress=T, stringsAsFactors = T)
-anno$chr <- to_chr_factor(anno$chr)
-#colnames(CpGislands) <- c("bin","chr", "start", "end", "name", "length", "cpgNum", "gcNum", "perCpG", "perGc", "obsExp")
-#save(file = "../../MethylationCode/MethylationData/Enhancers.Rdata", Enhancers)
-############################################################
 
 to_chr_factor <- Vectorize(function(chr_number)
 {
