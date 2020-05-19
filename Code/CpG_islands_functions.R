@@ -152,6 +152,6 @@ from_bed_to_annotation_with_wgbs_indexes <- function(bed_file, wgbs_data_file, c
   
   anno_improved = add_wgbs_indexes(anno, wgbs_data, cores)
   new_name = paste(substring(bed_file, 1, nchar(bed_file)-4), "_improved.Rda", sep = "")
-  saveRDS(anno, file = new_name)
+  saveRDS(anno_improved, file = new_name)
 }
 
