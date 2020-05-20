@@ -14,7 +14,7 @@ data_list = List(data_H1, data_stomach, data_HeLa, data_K562)
 
 ###################################################################
 H1_islands      = readRDS("../../Rexperiments/H1_island_data.Rda")
-stomach_islands = readRDS("../../Rexperiments/stomach_island_data.Rda")
+astomach_islands = readRDS("../../Rexperiments/stomach_island_data.Rda")
 K562_islands    = readRDS("../../Rexperiments/K562_island_data.Rda")
 HeLa_islands    = readRDS("../../Rexperiments/HeLa_S3_island_data.Rda")
 #####################################################################
@@ -77,6 +77,7 @@ min_reads = 5
 annotation_level_meth_correlation(H1_enhancers, stomach_enhancers, reads_name = "valid sites", min_reads, names = c("H1", "stomach"), main = "Enhancers: ")
 annotation_level_meth_correlation(H1_enhancers, HeLa_enhancers,    reads_name = "valid sites", min_reads, names = c("H1", "HeLa-S3"), main = "Enhancers: ")
 annotation_level_meth_correlation(H1_enhancers, K562_enhancers,    reads_name = "valid sites", min_reads, names = c("H1", "K562"), main = "Enhancers: ")
+
 
 ##### island level correlation
 #             Corr       coherence

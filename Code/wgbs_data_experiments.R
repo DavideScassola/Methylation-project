@@ -478,54 +478,55 @@ save(stomach_fragments_table_discrete, file = "../../Rexperiments/stomach_fragme
 # low not
 # 82
 
-d = H1_fragments_table[[1]][!is.na(H1_fragments_table[[1]]$msr),]
+table = H1_fragments_table_discrete
+d = table[[1]][!is.na(table[[1]]$msr),]
 
 middle_density = (d$density-0.5)<0.1
 low_density = (d$density)<0.4
 normal_density = (d$density)>0.75
-high_sig_high = (d$sig)>=1-(1e-5)
-high_sig_low = (d$sig)<=1e-5
-normal_sig = abs(d$sig-0.5)<=0.2
-high_sig = high_sig_high & high_sig_low
+sig_1 = (d$sig)>=1-(1e-5)
+sig_0 = (d$sig)<=1e-5
+normal_sig = abs(d$sig-0.5)<=0.3
+high_sig = sig_1 | sig_0
 
 #high sig, low density
 # 6274001, 18249001
 
 
-d[high_sig_low & middle_density, ]
+d[sig_1 & middle_density, ]
 # 0 sig, middle density
 # 298001, 859001
-show_fragment_info1(859001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+show_fragment_info1(859001, 1e3, data_H1, table[[1]], F, 3)
 
 d[normal_sig & middle_density, ]
 # 0.5 sig, middle density
 # 20038001, 2598001
-show_fragment_info1(2598001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+show_fragment_info1(2598001, 1e3, data_H1, table[[1]], F, 3)
 
-d[high_sig_high & middle_density, ]
+d[sig_0 & middle_density, ]
 # 1 sig, middle density
 # 6274001 # molto raro
-show_fragment_info1(6274001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+show_fragment_info1(6274001, 1e3, data_H1, table[[1]], F, 3)
 
 
 
 
-d[normal_sig & normal_density, ]
+d[sig_1 & normal_density, ]
 # 0.5 sig, high density
 # 172001, 431001
-show_fragment_info1(431001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+show_fragment_info1(431001, 1e3, data_H1, table[[1]], F, 3)
 
 
 d[high_sig_high & normal_density, ]
 # 1 sig, high density
 # 26146001, 24201001
-show_fragment_info1(24201001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+show_fragment_info1(24201001, 1e3, data_H1, table[[1]], F, 3)
 
 
-d[high_sig_low & normal_density, ]
+d[sig_0 & normal_density, ]
 # 0 sig, high density
 # 43001, 10857001
-show_fragment_info1(10857001, 1e3, data_H1, H1_fragments_table[[1]], F, 3)
+show_fragment_info1(10857001, 1e3, data_H1, table[[1]], F, 3)
 
 
 sample_fragment_plots <- function(n, data, table, discretize = F, min_reads = 3, range = 1e3)
