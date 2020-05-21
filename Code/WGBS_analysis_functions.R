@@ -16,6 +16,13 @@ meth_proportion_chromosome <- function(data, minimum_reads = 1, chromosome)
 
 sum_strands <- function(data, verbose = T)
 {
+  if(length(data$strand)==0)
+  {
+    if(verbose)
+      cat("no strands")
+    return(data)
+  }
+
   unstranded_data <- pick_plus_strand(data)
   
   minus_reads <- pick_minus_strand(data)[, reads]
@@ -604,7 +611,19 @@ annotation_level_meth_correlation <- function(data1, data2, reads_name, min_read
     lines(x = c(-100,200), y = c(50,50), lty = 2, col = 2)
     lines(x = c(50,50), y = c(-100,200), lty = 2, col = 2)
   }
-
   
+  library("ECctmc")
+  library("markovchain")
+  
+  data = data_H1
+  n = 1000
+  
+  p = data$prop[data$reads>=10]/100
+  bin = rbinom(n = length(p), size=1, prob = p)
+  t = table(bin[1:(length(bin)-1)], bin[2:(length(bin))])
+  prop.table(t,1)
+  
+  meth_model <- new("markovchain", states = c("0","1"), transitionMatrix = matrix(prop.table(t,1), nrow = 2))
+  sim <- rmarkovchain(n, object = meth_model, t0 = "0")
 }
 

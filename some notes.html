@@ -183,7 +183,8 @@ summary {
 
 <div id="wgbs-data" class="section level3">
 <h3>WGBS data</h3>
-<p>WGBS (Whole genome bisulfite sequencing) permits to determine the DNA methylation status of single cytosines in the whole genome (in the sense that estimates the ratio of molecules methylated), in our case we focus only on cytosines belonging to CpG sites.</p>
+<p>WGBS (Whole genome bisulfite sequencing) permits to determine the DNA methylation status of single cytosines in the whole genome (in the sense that estimates the ratio of methylated C in a certain position on the genome grouping reads from different cells), in our case we focus only on cytosines belonging to CpG sites.</p>
+<p>This is an example of WGBS data of H1 cells downloaded from encode (after dropping some columns):</p>
 <pre><code>##            chr     Cpos strand reads prop
 ##        1: chr1    10468      +     0    0
 ##        2: chr1    10469      -     2  100
@@ -228,20 +229,23 @@ summary {
 </div>
 <div id="cpg-sites-distribution-in-human-genome" class="section level3">
 <h3>CpG sites distribution in human genome</h3>
-<p>The frequency of CpG dinucleotides in human genomes is 0.98%, less than one-quarter of the expected frequency.</p>
+<p>The frequency of CpG dinucleotides in human genomes is 0.98% (in the sense that about 1 nucleotide over 100 belongs to a CpG site), less than one-quarter of the expected frequency.</p>
 <p><strong>CpG islands</strong> are regions (~ &gt; 300bp ) with a high frequency of CpG sites (~ &gt;3%) (there is not a precise definition). The total number is ~ 28.000 (~ 50.000 if you include repeat sequences ).</p>
 <p>In general they show significant lower methylation levels with respect to low CpG density regions. Although they have a relatively high CpG density, they contains only about 1-2% of all CpG sites, so their influence on the overall methylation rate is small.</p>
 <p>It seems that CpG islands have a functional importance, for example the methylation of CpG islands seems to results in stable silencing of gene expression.</p>
+<p>Anyway the methylation of CpG islands is similar between cells from different tissues, it does not show evident tissue-specific patterns.</p>
 </div>
 <div id="cell-types" class="section level3">
 <h3>Cell types</h3>
 <p><strong>H1</strong>: a line of Human Embryonic Stem Cells, they can be propagated indefinitely in vitro and they have the potential to differentiate into a variety of cell lineages.</p>
 <p><strong>HeLa</strong>: an immortal cell line first derived from cervical cancer cells, used extensively in scientific study since they are remarkably durable and prolific.</p>
 <p><strong>K562</strong>: myelogenous leukemia cell line (cancer of the white blood cells).</p>
+<p><strong>Stomach</strong>: tissue cells from stomach</p>
 </div>
 <div id="enhancers" class="section level3">
 <h3>Enhancers</h3>
 <p><strong>Enhancers</strong> are short (50–1500 bp) regions of DNA that can be bound by proteins to increase the likelihood that transcription of a particular gene will occur. They can be located up to 1,000,000 bp away from the gene.</p>
+<p>They are located in regions with low density of CpG sites (as usual ~1%), so an enhancer often contains few of them (or none).</p>
 <p>A reference on methylation: DNA Methylation and Its Basic Function: <a href="https://www.nature.com/articles/npp2012112.pdf" class="uri">https://www.nature.com/articles/npp2012112.pdf</a></p>
 </div>
 

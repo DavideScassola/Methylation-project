@@ -535,3 +535,9 @@ sample_fragment_plots <- function(n, data, table, discretize = F, min_reads = 3,
   for(i in s)
     show_fragment_info2(i, range, data, table, F, 3)
 }
+
+
+data = data_stomach
+
+p = data$prop[data$reads>=10]/100
+bin = rbinom(n = length(p), size=1, prob = p)

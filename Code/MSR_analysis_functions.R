@@ -2,6 +2,7 @@ suppressMessages(library(data.table))
 suppressMessages(library(pracma))
 suppressMessages(library(parallel))
 suppressMessages(library(scales))
+suppressMessages(library("markovchain"))
 
 calculate_relevance_from_counts <- function(vector, M)
 {
@@ -169,7 +170,7 @@ good_bin_sizes <- function(n)
   return(1:50)
 }
 
-good_bin_sizes <- function(n, max_bins = 100, losing_data_prop = 0.001)
+good_bin_sizes <- function(n, max_bins = 100, losing_data_prop = 0.01)
 {
   start <- 1
   end <- n
@@ -209,7 +210,7 @@ calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vecto
   
   start_time <- Sys.time()
   l <- length(methylation_vector)
-  bin_sizes <- good_bin_sizes(l, max_bins)
+  bin_sizes <- bin_sizes(l, max_bins)
   bin_sizes <- bin_sizes[(bin_sizes>minimum_bin_size) | (bin_sizes==1) ]
   
   nas <- is.na(methylation_vector)
@@ -561,6 +562,12 @@ autocor <- function(v, lag)
   cor.test(v[1:(l-lag)],v[(1+lag):l])
 }
 
+autotable <- function(v, lag)
+{
+  l = length(v)
+  table(v[1:(l-lag)],v[(1+lag):l])
+}
+
 random_binary_vector <- function(l, prop)
 {
   M <- round(l*prop)
@@ -650,6 +657,13 @@ general_msr_cdf <- function(ecdfs, density, msr)
       return(ecdfs[[i]]$cdf(msr)*(1-w)+(w)*ecdfs[[i+1]]$cdf(msr))
     }
   }
+}
+
+
+markovchain_fake_data <- function(size, transition_matrix)
+{
+  model <- new("markovchain", states = c("0","1"), transitionMatrix = transition_matrix)
+  as.integer(rmarkovchain(size, object = meth_model, t0 = "0"))
 }
 
 #setwd("./Scrivania/Tesi/MethylationCode/")
