@@ -210,7 +210,7 @@ calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vecto
   
   start_time <- Sys.time()
   l <- length(methylation_vector)
-  bin_sizes <- bin_sizes(l, max_bins)
+  bin_sizes <- good_bin_sizes(l, max_bins)
   bin_sizes <- bin_sizes[(bin_sizes>minimum_bin_size) | (bin_sizes==1) ]
   
   nas <- is.na(methylation_vector)
@@ -268,11 +268,17 @@ genome_MSR <- function(methylation_positions, minimum_bin_size = 10, verbose = T
   return(rr)
 }
 
-# supposing resolution is in decresing order
+
+# supposing resolution is in decreasing order
 MSR_area<- function(rr_vector, M_correction = 10)
 {
   return(trapz(x = rev(rr_vector[2,]), y = rev(rr_vector[1,]))*log10(M_correction))
-  
+}
+
+MSR_area<- function(rr_vector)
+{
+  ord = order(rr_vector[2,])
+  return(trapz(x = rr_vector[2,][ord], y = rr_vector[1,][ord] ))
 }
 
 calculate_MSR_area<- function(v)
@@ -665,6 +671,22 @@ markovchain_fake_data <- function(size, transition_matrix)
   model <- new("markovchain", states = c("0","1"), transitionMatrix = transition_matrix)
   as.integer(rmarkovchain(size, object = meth_model, t0 = "0"))
 }
+
+
+prop_msr_samples <- function(l, props, sample_size, cores = 1, verbose = F)
+{
+  start_time <- Sys.time()
+  msr_samples = mcmapply(1:sample_size, mc.preschedule = T, mc.cores = cores, FUN =  function(n)
+  {
+    v = rbinom(n = l, size = 1, prob = probs)
+    rr_v <- calculate_relevance_resolution_vector(methylation_vector = v, verbose = F, na_tolerance = 0.1)
+    MSR_area(rr_v)
+  })
+  if(verbose) cat("time: ", Sys.time()-start_time)
+  
+  return(msr_samples)
+}
+
 
 #setwd("./Scrivania/Tesi/MethylationCode/")
 #directory <- "MethylationData/binary_rate/"

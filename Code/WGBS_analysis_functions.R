@@ -151,10 +151,11 @@ replace_few_reads_entries <- function(data, threshold = 1, verbose = T)
 
 replace_no_reads_entries <- function(data) {replace_few_reads_entries(data, 1)}
 
-keep_nas <- function(data)
+keep_nas <- function(data, minimum_reads = 1)
 {
-  data[(data$reads == 0),]$prop <- NA
-  cat("Keeping missing data proportion: ", sum((data$reads == 0)/length(data$reads)), "\n")
+  data[(data$reads < minimum_reads),]$prop <- NA
+  data[(data$prop == 50),]$prop <- NA
+  cat("Keeping missing data proportion: ", sum((is.na(data$prop))/length(data$reads)), "\n")
   return(data[,-"reads"])
 }
 
@@ -444,14 +445,15 @@ spatial_MSR_experiment_by_chromosome <- function(pos, window_size, fake_data, mi
   return(List(fragments_infos_array=fragments_infos_array, rr_list=rr_fragments_list, get_valid_rrs=get_valid_rrs))
 }
 
-total_spatial_experiment <- function(files, sizes, inversion, names, methylation_assigner, na_tolerance, fake_data)
+total_spatial_experiment <- function(files, sizes, inversion, names, methylation_assigner, na_tolerance, fake_data, minimum_reads = 1)
 {
   result = List()
   
   for(i in 1:length(files))
   {
     data <- read_ENCODE_bed(files[i], verbose = T)
-    binary <- get_methylation_CpG_binary_vector(data,strands_handler = sum_strands, methylation_assigner = methylation_assigner, missing_read_handler = keep_nas)
+    mrh <- function(x) keep_nas(x, minimum_reads)
+    binary <- get_methylation_CpG_binary_vector(data,strands_handler = sum_strands, methylation_assigner = methylation_assigner, missing_read_handler = mrh)
     remove(data)
     gc()
     
@@ -611,19 +613,16 @@ annotation_level_meth_correlation <- function(data1, data2, reads_name, min_read
     lines(x = c(-100,200), y = c(50,50), lty = 2, col = 2)
     lines(x = c(50,50), y = c(-100,200), lty = 2, col = 2)
   }
+
+
+  get_transition_matrix <- function(wgbs_data, min_reads = 10)
+  {
+    wgbs_data = sum_strands(wgbs_data)
+    p = wgbs_data$prop[data$reads>=min_reads]/100
+    bin <- rbinom(n = length(p), size=1, prob = p)
+    matrix(prop.table(autotable(bin,1),1), nrow = 2)
+  }
   
-  library("ECctmc")
-  library("markovchain")
   
-  data = data_H1
-  n = 1000
-  
-  p = data$prop[data$reads>=10]/100
-  bin = rbinom(n = length(p), size=1, prob = p)
-  t = table(bin[1:(length(bin)-1)], bin[2:(length(bin))])
-  prop.table(t,1)
-  
-  meth_model <- new("markovchain", states = c("0","1"), transitionMatrix = matrix(prop.table(t,1), nrow = 2))
-  sim <- rmarkovchain(n, object = meth_model, t0 = "0")
 }
 
