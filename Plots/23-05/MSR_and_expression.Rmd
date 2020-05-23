@@ -1,0 +1,252 @@
+---
+title: "MSR and expression"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(fig.width=20, fig.height=12) 
+
+#setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
+#source("Methylation-project/Code/expression_and_msr_experiment.R", chdir = T)
+```
+
+
+
+
+```{r, include=FALSE}
+library("PerformanceAnalytics")
+setwd(dir = "../../../")
+source("Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
+
+
+##########################
+file_rna_stomach = "MethylationCode/MethylationData/rna-seq/ENCFF918KPC_stomach.tsv"
+stomach_rna <- read_rna_file(file_rna_stomach)
+load("Rexperiments/stomach_fragments_table.Rdata")
+load("Rexperiments/stomach_fragments_table_discrete.Rdata")
+load("Rexperiments/stomach_fragments_table_adaptive.Rdata")
+load("Rexperiments/stomach_rna_fragment_tables.Rdata")
+data_stomach <- readRDS("MethylationCode/MethylationData/wgbs/stomach.Rda")
+data_stomach <- sum_strands(data_stomach)
+genebody = readRDS("Rexperiments/genebody_improved.Rda")
+#########################
+
+y <- c("gene_count", "total_TPM")
+basic_predictors <- c("nucleotides", "CpG_density", "meth rate")
+essentials <- c(y, basic_predictors)
+essential_msr_predictors <- c("msr", "inverted_msr")
+fancy_msr_predictors <- c("ecdf", "inverted ecdf", "residual", "inverted_residual")
+msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
+```
+
+Here I will investigate if there is a relationship between the presence of genes and genes expression in a certain genomic region and the MSR (with some of its derivate statistics).
+
+I chose stomach cells data in order to do this, and CpG windows of size 1000, that corresponds to a variable window size in term of nucleotides (on average about 100,000).
+
+
+This is an example of total-rna-seq file, that shows for each "gene" its transcripts and some measures of expression. In this case I just kept two colums.
+The first one indicates the "gene"", the second one is the Transcript Per Million that is a relative measure of how much a gene is expressed.
+
+```{r, echo=FALSE}
+#stomach_rna
+stomach_rna[nchar(gene_id)>6]
+```
+
+This is the annotation file that store the position occupied by each human gene.
+
+```{r, echo=FALSE}
+genebody[,c(1,2,3,4,5,6)]
+```
+The number of genes is much less than the ones in the total-rna-seq file, since the first one also contains so called pseudogenes and other stuff.
+
+
+
+So the final dataFrame is the following (excluding some columns for readability):
+```{r, echo=FALSE}
+data_table <- join_rna_and_msr_tables(stomach_rna_fragment_tables, stomach_fragments_table_discrete, 1)
+data_table <- exclude_outliers(data_table, lim = 2.5e5)
+head(data_table[complete.cases(data_table), c(1,2,3,5,7,11)])
+```
+
+The full scheme includes:
+
+**nucleotides**: number of nucleotides in the window
+
+**CpG density**: fraction of nucleotides that is a C of a CpG site (= 1000/nucleotides)
+
+**meth rate**: ratio of methylated CpG sites
+
+**gene_count**: number of genes included (even partially) inside the interval
+
+**total_TPM**: sum of the TPMs of the genes in the interval
+
+then the MSR and some related statistics: 
+**msr**, **inverted msr**, **msr ecdf **, **inverted msr ecdf**, **residual** (residual of the linear regression between msr and meth rate), **inverted residual**.
+
+
+
+First let's see if there are pairwise correlations between the features.
+
+###### Basic features:
+
+```{r, echo=FALSE}
+chart.Correlation(data_table[,essentials])
+```
+
+
+###### Comparison with simple MSR statistics:
+```{r, echo=FALSE}
+chart.Correlation(data_table[,c(essentials, essential_msr_predictors)])
+```
+
+######Comparison with other MSR statistics:
+```{r, echo=FALSE}
+chart.Correlation(data_table[,c(y, fancy_msr_predictors)])
+```
+
+
+#### Predicting gene presence
+Check if features can predict gene presence:
+
+```{r, echo=FALSE}
+gene_mask = data_table$gene_count>0
+feature = feature = data_table$`meth rate`
+feature_name = "methylation rate"
+
+binary_predictivity_hist(feature,
+                         mask = gene_mask,
+                         xlab = feature_name, sep_names = c("one or more genes", "no genes"),
+                         colors = c(5,7), breaks = 15,
+                         main = sprintf("Can %s predict the presence of a gene?", feature_name),
+                         max_y = 8)
+
+```
+
+```{r, echo=FALSE}
+
+feature = feature = 1000/data_table$nucleotides
+feature_name = "CpG density"
+
+binary_predictivity_hist(feature,
+                         mask = gene_mask,
+                         xlab = feature_name, sep_names = c("one or more genes", "no genes"),
+                         colors = c(5,7), breaks = 15,
+                         main = sprintf("Can %s predict the presence of a gene?", feature_name),
+                         max_y = 70)
+
+```
+
+```{r, echo=FALSE}
+
+feature = data_table$inverted_msr
+feature_name = "inverted MSR"
+
+binary_predictivity_hist(feature,
+                         mask = gene_mask,
+                         xlab = "inverted MSR", sep_names = c("one or more genes", "no genes"),
+                         colors = c(5,7), breaks = 15,
+                         main = sprintf("Can %s predict the presence of a gene?", feature_name),
+                         max_y = 30)
+
+#feature = data_table$inverted_msr
+#feature = data_table$`ecdf(msr, density)`
+#feature = data_table$`inverted ecdf(msr, density)`
+```
+
+```{r, echo=FALSE}
+
+feature = feature = data_table$`inverted ecdf`
+feature_name = "inverted ecdf"
+
+binary_predictivity_hist(feature,
+                         mask = gene_mask,
+                         xlab = feature_name, sep_names = c("one or more genes", "no genes"),
+                         colors = c(5,7), breaks = 15,
+                         main = sprintf("Can %s predict the presence of a gene?", feature_name),
+                         max_y = 13)
+
+```
+
+
+
+
+```{r, echo=FALSE}
+
+gene_0 = data_table$gene_count==0
+gene_1 = data_table$gene_count==1
+gene_2 = data_table$gene_count==2
+gene_many = data_table$gene_count>2
+
+boxplot(data_table$inverted_msr[gene_0], data_table$inverted_msr[gene_1], data_table$inverted_msr[gene_2], data_table$inverted_msr[gene_many], names = c("No genes", "one gene", "two genes", "more than 2 genes"), ylab = "inverted MSR")
+title("Inverted MSR and number of genes")
+
+```
+
+
+The fraction of fragments that have at least one gene inside is
+```{r, echo=FALSE}
+mean(data_table$gene_count>0, na.rm=T)
+```
+
+Logistic Regression Model for gene presence with basic predictors (nucleotides, CpG_density, meth rate):
+
+```{r, echo=FALSE}
+
+# Logistics Regression
+model_data = data_table[complete.cases(data_table),]
+glm.fit <- glm(model_data$gene_count>0 ~ nucleotides+CpG_density+`meth rate`, data = model_data[, c(essentials)], family = binomial)
+#summary(glm.fit)
+
+probabilities = predict(glm.fit, type="response")
+prediction = probabilities>0.5
+actual = model_data$gene_count>0
+t = table(actual, prediction)
+prop.table(t)
+
+cat("\naccuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
+```
+
+
+Logistic Regression Model with inverted_msr as predictor
+```{r, echo=FALSE}
+
+# Logistics Regression
+glm.fit <- glm(model_data$gene_count>0 ~ model_data$inverted_msr, data = model_data, family = binomial)
+#summary(glm.fit)
+
+probabilities = predict(glm.fit, type="response")
+prediction = probabilities>0.5
+actual = model_data$gene_count>0
+t = table(actual, prediction)
+prop.table(t)
+
+cat("\naccuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
+
+```
+
+
+Adding other predictors doesn't significantly improve the accuracy.
+
+
+#### Predicting TPM
+
+Linear model for TPM with standard predictors:
+```{r, echo=FALSE}
+gene_presence = data_table$gene_count>0
+model = lm(total_TPM ~ . , data = data_table[gene_presence, c(essentials)])
+summary(model)
+
+```
+
+Linear model for TPM with all MSR statistics:
+```{r, echo=FALSE}
+model = lm(total_TPM ~ . , data = data_table[gene_presence, c(essentials, msr_predictors)])
+summary(model)
+```
+
+There is no signal, one problem can be that we are only considering expression by a limited set of genes.
+
+
+
+
