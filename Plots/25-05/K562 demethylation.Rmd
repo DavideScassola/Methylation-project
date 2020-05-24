@@ -1,0 +1,101 @@
+---
+title: "K562 demethylation"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=10, fig.height=6) 
+```
+
+In order to compare K562 cells methylation with H1 cells we can check the distribution of the difference in the methylation proportion for each site. So for each site I subtract the methylation rate of H1 with the one of K562.
+
+```{r, include=FALSE}
+
+source("../../Code/WGBS_analysis_functions.R", chdir = T)
+
+data_H1 <- sum_strands(readRDS("../../../MethylationCode/MethylationData/wgbs/H1.Rda"))
+data_K562 <- sum_strands(readRDS("../../../MethylationCode/MethylationData/wgbs/K562.Rda"))
+gc(full=T)
+
+cgi_anno <- readRDS("../../../Rexperiments/cgi_improved.Rda")
+cgi_anno = cgi_anno[!is.infinite(i_start)]
+
+d1 = data_H1
+d2 = data_K562
+name1 = "H1"
+name2 = "K562"
+
+min_reads = 10
+
+
+island_mask = rep_len(F, length(data_H1$prop))
+meth_island_mask = island_mask = rep_len(F, length(data_H1$prop))
+st = cgi_anno$i_start
+en = cgi_anno$i_end
+l = length(cgi_anno$i_start)
+p = data_H1$prop
+p[is.na(p)] = 0
+prop_H1_cumulative = corrected_cumsum(p)
+```
+
+
+```{r, include = FALSE}
+
+island_mask = rep_len(F, length(data_H1$prop))
+meth_island_mask = island_mask = rep_len(F, length(data_H1$prop))
+st = cgi_anno$i_start
+en = cgi_anno$i_end
+l = length(cgi_anno$i_start)
+p = data_H1$prop
+p[is.na(p)] = 0
+prop_H1_cumulative = corrected_cumsum(p)
+
+for(i in 1:l)
+{
+  island_mask[st[i]:en[i]] = T
+  meth_island_mask[st[i]:en[i]] = ((prop_H1_cumulative[en[i]]-prop_H1_cumulative[st[i]])/(en[i]-st[i]))>80
+}
+
+reads_mask = (d1$reads >= min_reads) & (d2$reads >= min_reads)
+  
+d1p_islands = d1[reads_mask & island_mask, ]$prop
+d2p_islands = d2[reads_mask & island_mask, ]$prop
+diff_islands = d1p_islands-d2p_islands
+  
+d1p_meth_islands = d1[reads_mask & meth_island_mask, ]$prop
+d2p_meth_islands = d2[reads_mask & meth_island_mask, ]$prop
+diff_meth_islands = d1p_meth_islands-d2p_meth_islands
+  
+d1p_sea = d1[reads_mask & !island_mask, ]$prop
+d2p_sea = d2[reads_mask & !island_mask, ]$prop
+diff_sea = d1p_sea-d2p_sea
+  
+#difference_meth_plot(data_H1, data_K562, "H1", "K562", 10, cgi_anno, island_mask, meth_island_mask)
+```
+
+
+
+```{r, echo = FALSE}
+hist(diff_sea, breaks = 50, main = sprintf("Methylation difference in CG sites outside CpG island, mean: %s", round(mean(diff_sea, na.rm=T),2)), xlab = sprintf("%s - %s", name1, name2), col = 5, cex = 2)
+```
+  
+  
+```{r, echo = FALSE}
+hist(diff_islands, breaks = 50, main = sprintf("Methylation difference in CG sites inside CpG island, mean: %s", round(mean(diff_islands, na.rm=T),2)), xlab = sprintf("%s - %s", name1, name2), col = "yellow", cex = 2)
+```
+
+It's interesting to check this difference considering only the Islands that have a high methylation rate:
+```{r, echo = FALSE}
+hist(diff_meth_islands, breaks = 50, main = sprintf("Methylation difference in CG sites belonging to methylated CpG island, mean: %s", round(mean(diff_meth_islands, na.rm=T),2)), xlab = sprintf("%s - %s", name1, name2), col = alpha("red", 0.5), cex = 1.75)
+```
+
+  
+```{r, echo = FALSE}
+hist(diff_meth_islands, breaks = 50, main = "", xlab = sprintf("%s - %s", name1, name2), col = alpha("red", 0.5), probability = T, ylim = c(0, 0.045), cex = 1.75)
+
+hist(diff_sea, breaks = 50, col = alpha(5, 0.5), add = T, probability = T, cex = 1.75)
+
+legend("topleft", legend = c("inside methylated islands","outside islands"), col=c(alpha("red", 0.5), alpha(5, 0.5)), fill = c(alpha("red", 0.5), alpha(5, 0.5)), cex = 1.5)
+```
+
