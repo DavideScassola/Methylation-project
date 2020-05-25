@@ -463,7 +463,7 @@ total_spatial_experiment <- function(files, sizes, inversion, names, methylation
       {
         gc()
         rrs <- spatial_MSR_experiment_CpG_list(binary, inv, s, fake_data, na_tolerance)
-        return(List(name=names[i], inverted=inv, window_size=s, data=rrs))
+        return(List(name=names[i], file= files[i],inverted=inv, window_size=s, data=rrs))
       })
       result[[paste(names[i], "inverted:", inv, sep = "_")]] <- result_si
     }
@@ -625,4 +625,214 @@ annotation_level_meth_correlation <- function(data1, data2, reads_name, min_read
   
   
 }
+
+
+#####################################################
+
+remove_version_from_gene <- Vectorize(function(s)
+{
+  if(substr(s, 1, 4)=="ENSG")
+    return(substr(s, 1, 15))
+  else(return(s))
+})
+
+read_rna_file <- function(file_rna, reduced = T, correct_gene_id = T)
+{
+  stomach_rna <- fread(file = file_rna,verbose=F, showProgress=T, stringsAsFactors = T)
+  if(reduced)
+    stomach_rna = stomach_rna[,c("gene_id", "TPM")]
+  
+  if(correct_gene_id)
+  {
+    stomach_rna$gene_id = remove_version_from_gene(as.character(stomach_rna$gene_id))
+  }
+  
+  return(stomach_rna)
+}
+
+get_genes_by_region <- function(start_chr, start_position, end_position, genebody_annotation)
+{
+  # fully included
+  #genebody_annotation[chr==start_chr & start>=start_position & end<=end_position]$id
+  
+  # start included
+  genebody_annotation[chr==start_chr & start>=start_position & start<=end_position]$id
+}
+
+get_genes_nucleotides_intersection <- function(start_chr, start_position, end_position, genebody_annotation)
+{
+  # fully included
+  
+  # start included
+  i = which(genebody_annotation$chr==start_chr & genebody_annotation$start>=start_position & genebody_annotation$start<=end_position)
+  sum(pmin(genebody_annotation$end[i], end_position)-genebody_annotation$start[i])
+  
+}
+
+get_TPM <- function(ids, rna_data)
+{
+  rna_data[gene_id %in% (ids), TPM]
+}
+
+make_rna_window_data_frame <- function(wgbs_data, rna_data, genebody_annotation, window)
+{
+  wgbs_data = sum_strands(wgbs_data, verbose = F)
+  
+  l = length(wgbs_data$prop)
+  fragments <- floor(l/window)
+  i_starting_points <- ((0:(fragments-1))*window)+1
+  
+  window = i_starting_points[2]-i_starting_points[1]
+  start_positions = wgbs_data[i_starting_points]$Cpos
+  start_chr = wgbs_data[i_starting_points]$chr
+  end_positions = wgbs_data[i_starting_points+window]$Cpos
+  #end_chr = wgbs_data[i_starting_points+window]$chr
+  l = length(start_positions)
+  
+  rna_data = rna_data[gene_id %in% genebody_annotation$id]
+  
+  gene_info = sapply(1:l, function(i)
+  {
+    cat(i, " ")
+    genes = get_genes_by_region(start_chr[i], start_positions[i], end_positions[i], genebody_annotation)
+    genes_nucleotides_count <- get_genes_nucleotides_intersection(start_chr[i], start_positions[i], end_positions[i], genebody_annotation)
+    tpm = get_TPM(genes, rna_data)
+    total_TPM = sum(tpm)
+    c(length(genes), sum(tpm), genes_nucleotides_count)
+  })
+  
+  nucleotides = end_positions-start_positions
+  nucleotides[nucleotides<=0] = NA
+  
+  data.frame(start_chr, start_position, end_position,
+             nucleotides, gene_count = gene_info[1,], genes_nucleotides_count = gene_info[3,], total_TPM = gene_info[2,])
+}
+
+make_msr_rna_data_frame <- function(wgbs_data, rna_data, genebody_annotation, msr_experiment_data_frame)
+{
+  
+  wgbs_data = sum_strands(wgbs_data, verbose = F)
+  i_starting_points = msr_experiment_data_frame$start
+  window = i_starting_points[2]-i_starting_points[1]
+  start_positions = wgbs_data[i_starting_points]$Cpos
+  start_chr = wgbs_data[i_starting_points]$chr
+  end_positions = wgbs_data[i_starting_points+window]$Cpos
+  #end_chr = wgbs_data[i_starting_points+window]$chr
+  l = length(start_positions)
+  
+  rna_data = rna_data[gene_id %in% genebody_annotation$id]
+  
+  gene_info = sapply(1:l, function(i)
+  {
+    cat(i, " ")
+    genes = get_genes_by_region(start_chr[i], start_positions[i], end_positions[i], genebody_annotation)
+    genes_nucleotides_count <- get_genes_nucleotides_intersection(start_chr[i], start_positions[i], end_positions[i], genebody_annotation)
+    tpm = get_TPM(genes, rna_data)
+    total_TPM = sum(tpm)
+    c(length(genes), sum(tpm), genes_nucleotides_count)
+  })
+  
+  nucleotides = end_positions-start_positions
+  nucleotides[nucleotides<=0] = NA
+  
+  out = cbind(data.frame(start_chr, start_positions, end_positions,
+                         nucleotides, gene_count = gene_info[1,], genes_nucleotides_count = gene_info[3,], total_TPM = gene_info[2,]
+  ), msr_experiment_data_frame)
+  
+  
+  return(out)
+}
+
+join_rna_and_msr_tables <- function(rna_tables, msr_tables, i)
+{
+  df = cbind(rna_tables[[i]], msr_tables[[i]])
+  
+  df$log_tpm = log(df$total_TPM+ 1e-3)
+  
+  colnames(df)[8] <- "i_start"
+  colnames(df)[10] <- "meth rate"
+  colnames(df)[13] <- "ecdf"
+  colnames(df)[14] <- "inverted ecdf"
+  
+  df$CpG_density = (df$i_start[2]-df$i_start[1])/df$nucleotides
+  
+  df
+}
+
+produce_fragments_rna_tables <- function(wgbs_data, rna_data, genebody_annotation, sizes = c(1e3,1e4,1e5,1e6))
+{
+  tables = lapply(sizes, function(window)
+  {
+    make_rna_window_data_frame(wgbs_data, rna_data, genebody_annotation, window)
+  })
+  return(tables)
+}
+
+exclude_outliers <- function(table, lim = 1e6, verbose = T)
+{
+  too_much_nucleotides <- (table$nucleotides > lim)
+  if(verbose) cat(sprintf("%d rows had too many nucleotides", sum(too_much_nucleotides, na.rm=T)))
+  return(table[!too_much_nucleotides, ])
+}
+#####################################################
+
+binary_predictivity_hist <- function(feature, mask, feature_name, sep_names, colors = c(5,7), breaks = 10, main = "", max_y = 10, xlab = "")
+{
+  yes = feature[mask]
+  no = feature[!mask]
+  
+  colors = c(alpha(colors[1],0.5), alpha(colors[2],0.5))
+
+  hist(yes, col = colors[1], probability = T, breaks = breaks, xlab = xlab, main = main, ylim = c(0,max_y))
+  hist(no, col = colors[2], probability = T, add = T, breaks = breaks)
+  
+  legend("top", legend=c(sep_names[1], sep_names[2]), col=colors, fill = colors, cex = 0.75)
+}
+
+
+difference_meth_plot <- function(d1, d2, name1, name2, min_reads, cgi_anno, island_mask, meth_island_mask)
+{
+  
+  reads_mask = (d1$reads >= min_reads) & (d2$reads >= min_reads)
+  
+  d1p_islands = d1[reads_mask & island_mask, ]$prop
+  d2p_islands = d2[reads_mask & island_mask, ]$prop
+  diff_islands = d1p_islands-d2p_islands
+  
+  d1p_meth_islands = d1[reads_mask & meth_island_mask, ]$prop
+  d2p_meth_islands = d2[reads_mask & meth_island_mask, ]$prop
+  diff_meth_islands = d1p_meth_islands-d2p_meth_islands
+  
+  d1p_sea = d1[reads_mask & !island_mask, ]$prop
+  d2p_sea = d2[reads_mask & !island_mask, ]$prop
+  diff_sea = d1p_sea-d2p_sea
+  
+  par(ask=TRUE)
+  hist(diff_sea, breaks = 50, main = sprintf("Methylation difference in CG sites outside CpG island, mean: %s", round(mean(diff_sea, na.rm=T),2)), xlab = sprintf("%s - %s", name1, name2), col = 5)
+  hist(diff_islands, breaks = 50, main = sprintf("Methylation difference in CG sites inside CpG island, mean: %s", round(mean(diff_islands, na.rm=T),2)), xlab = sprintf("%s - %s", name1, name2), col = "yellow")
+  
+  par(mfrow = c(1,1))
+  hist(diff_meth_islands, breaks = 50, main = sprintf("Methylation difference in CG sites belonging to methylated CpG island, mean: %s", round(mean(diff_meth_islands, na.rm=T),2)), xlab = sprintf("%s - %s", name1, name2), col = "red")
+  
+  #par(ask=TRUE)
+  #par(mfrow = c(2,1))
+  
+  #plot(diff_sea[0:1e3], type = "l", main = "outside CpG island", xlab = sprintf("%s - %s", name1, name2), col = 1)
+  #lines(x = c(-100, 1e7), y = c(0,0), lty = 2, col = alpha("red", 0.7))
+  #lines(x = c(-100, 1e7), y = c(50,50), lty = 2, col = alpha("orange", 0.7))
+  #lines(x = c(-100, 1e7), y = c(-50,-50), lty = 2, col = alpha("orange", 0.7))
+  
+  #plot(diff_islands[0:1e3], type = "l", main = "inside CpG island", xlab = sprintf("%s - %s", name1, name2), col = 1)
+  #lines(x = c(-100, 1e7), y = c(0,0), lty = 2, col = alpha("red", 0.7))
+  #lines(x = c(-100, 1e7), y = c(50,50), lty = 2, col = alpha("orange", 0.7))
+  #lines(x = c(-100, 1e7), y = c(-50,-50), lty = 2, col = alpha("orange", 0.7))
+  
+  par(ask=FALSE)
+  
+  
+  
+}
+
+
+
 

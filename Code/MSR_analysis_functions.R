@@ -2,7 +2,7 @@ suppressMessages(library(data.table))
 suppressMessages(library(pracma))
 suppressMessages(library(parallel))
 suppressMessages(library(scales))
-suppressMessages(library("markovchain"))
+#suppressMessages(library("markovchain"))
 
 calculate_relevance_from_counts <- function(vector, M)
 {
@@ -666,11 +666,11 @@ general_msr_cdf <- function(ecdfs, density, msr)
 }
 
 
-markovchain_fake_data <- function(size, transition_matrix)
-{
-  model <- new("markovchain", states = c("0","1"), transitionMatrix = transition_matrix)
-  as.integer(rmarkovchain(size, object = meth_model, t0 = "0"))
-}
+#markovchain_fake_data <- function(size, transition_matrix)
+#{
+#  model <- new("markovchain", states = c("0","1"), transitionMatrix = transition_matrix)
+#  as.integer(rmarkovchain(size, object = meth_model, t0 = "0"))
+#}
 
 
 prop_msr_samples <- function(l, props, sample_size, cores = 1, verbose = F)

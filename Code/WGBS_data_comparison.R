@@ -84,3 +84,26 @@ annotation_level_meth_correlation(H1_enhancers, K562_enhancers,    reads_name = 
 # H1-stomach: 0.527691   0.8009343
 # H1-Hela_S3: 0.2983441  0.7712936
 # H1-K562:    0.1993023  0.3655242
+
+
+
+
+
+#############################################################
+
+cgi_anno <- readRDS("../../Rexperiments/cgi_improved.Rda")
+cgi_anno = cgi_anno[!is.infinite(i_start)]
+
+
+d1 = data_H1
+d2 = data_K562
+name1 = "H1"
+name2 = "K562"
+
+min_reads = 10
+
+
+
+
+
+
