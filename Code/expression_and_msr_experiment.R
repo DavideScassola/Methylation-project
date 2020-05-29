@@ -1,4 +1,4 @@
-#setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
+setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
 
 #source("WGBS_analysis_functions.R", chdir = T)
 source("Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
@@ -62,4 +62,21 @@ gene_many = data_table$gene_count>2
 
 boxplot(data_table$inverted_msr[gene_0], data_table$inverted_msr[gene_1], data_table$inverted_msr[gene_2], data_table$inverted_msr[gene_many], names = c("No genes", "one gene", "two genes", "more than 2 genes"), ylab = "inverted MSR")
 title("Inverted MSR and number of genes")
+
+
+modello = gam( data_table[ data_table$gene_count>0,]$log_tpm ~
+                 s(data_table[ data_table$gene_count>0, 4]) +
+                 s(data_table[ data_table$gene_count>0, 9]) +
+                 s(data_table[ data_table$gene_count>0, 10]) +
+                 s(data_table[ data_table$gene_count>0, 11]) +
+                 s(data_table[ data_table$gene_count>0, 12]) +
+                 s(data_table[ data_table$gene_count>0, 14]) +
+                 s(data_table[ data_table$gene_count>0, 18])
+               )
+
+
+
+
+stomach_tables = produce_fragments_rna_tables(data_stomach, stomach_rna, genebody, sizes = c(1e3,1e4,1e5))
+H1_tables = produce_fragments_rna_tables(data_stomach, stomach_rna, genebody, sizes = c(1e3,1e4,1e5))
 

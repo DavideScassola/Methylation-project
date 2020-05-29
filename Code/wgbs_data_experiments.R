@@ -18,7 +18,9 @@ data_HeLa <- readRDS(file_HeLa)
 ####################################################
 # MSR EXPERIMENTS ON DIFFERENT WINDOWS
 load(file = "../../Rexperiments/total_exp.Rdata")
-load(file = "../../Rexperiments/total_exp_discrete.Rdata")
+load(file = "../../Rexperiments/total_exp_discrete_V2.Rdata")
+load(file = "../../Rexperiments/total_exp_stoc_V2.Rdata")
+
 load(file = "../../Rexperiments/total_exp_adaptive.Rdata")
 load(file = "../../Rexperiments/total_exp_fake.Rdata")
 load(file = "../../Rexperiments/total_exp_chr1.Rdata")
@@ -137,7 +139,7 @@ significance_measure <- function(exp_datas, msr_ecdfs, i)
   
   sapply( 1:l ,function(n)
   {
-    cat(n, " ")
+    #cat(n, " ")
     if(is.na(density[n]) || is.na(msr[n])) return(NA)
     general_msr_cdf(msr_ecdf, density[n], msr[n])
   })
@@ -159,7 +161,8 @@ experiment_residuals <- function(exp_datas, i)
 
 get_sig_measures <- function(exp)
 {
-  lapply(1:4, function(i)
+  l = length(exp)
+  lapply(1:l, function(i)
   {
     significance_measure(exp, msr_ecdf,i)
   })
@@ -167,7 +170,8 @@ get_sig_measures <- function(exp)
 
 get_residual_measures <- function(exp)
 {
-  lapply(1:4, function(i)
+  l = length(exp)
+  lapply(1:l, function(i)
   {
     experiment_residuals(exp, i)
   })
@@ -332,6 +336,9 @@ density_MSR_correlation(total_exp_discrete$`H1_inverted:_FALSE`, "H1", fix = T)
 density_MSR_correlation(total_exp_discrete$`H1_inverted:_TRUE`, "H1, inverted")
 density_MSR_correlation(total_exp_discrete$`stomach_inverted:_FALSE`, "stomach", fix = T)
 density_MSR_correlation(total_exp_discrete$`stomach_inverted:_TRUE`, "stomach", fix = T)
+
+density_MSR_correlation(total_exp_discrete$`HeLa_inverted:_FALSE`, "stomach", fix = T)
+density_MSR_correlation(total_exp_discrete$`K562_inverted:_FALSE`, "stomach", fix = T)
 
 density_MSR_correlation(total_exp$`stomach_inverted:_FALSE`, "stomach")
 density_MSR_correlation(total_exp_adaptive$`H1_inverted:_FALSE`, "H1")
@@ -498,33 +505,25 @@ save(H1_fragments_table, file = "../../Rexperiments/H1_fragments_table.Rdata")
 save(stomach_fragments_table, file = "../../Rexperiments/stomach_fragments_table.Rdata")
 
 
-#------------------------------------------
+#----------------------------------------------------------------
 
-H1_inverted_FALSE_sig <- get_sig_measures(total_exp_adaptive$`H1_inverted:_FALSE`)
-H1_inverted_TRUE_sig <- get_sig_measures(total_exp_adaptive$`H1_inverted:_TRUE`)
-stomach_inverted_FALSE_sig <- get_sig_measures(total_exp_adaptive$`stomach_inverted:_FALSE`)
-stomach_inverted_TRUE_sig <- get_sig_measures(total_exp_adaptive$`stomach_inverted:_TRUE`)
+load("../../Rexperiments/total_exp_discrete_V2.Rdata")
+experiment = total_exp_discrete
+filename = "../../Rexperiments/stomach_fragments_table_discrete_V2.Rdata"
+data = data_stomach
+  
+inverted_FALSE_sig <- get_sig_measures(experiment$`stomach_inverted:_FALSE`)
+inverted_TRUE_sig <- get_sig_measures(experiment$`stomach_inverted:_TRUE`)
+inverted_FALSE_res <- get_residual_measures(experiment$`stomach_inverted:_FALSE`)
+inverted_TRUE_res <- get_residual_measures(experiment$`stomach_inverted:_TRUE`)
 
-H1_inverted_FALSE_res <- get_residual_measures(total_exp_adaptive$`H1_inverted:_FALSE`)
-H1_inverted_TRUE_res <- get_residual_measures(total_exp_adaptive$`H1_inverted:_TRUE`)
-stomach_inverted_FALSE_res <- get_residual_measures(total_exp_adaptive$`stomach_inverted:_FALSE`)
-stomach_inverted_TRUE_res <- get_residual_measures(total_exp_adaptive$`stomach_inverted:_TRUE`)
-
-
-
-H1_fragments_table_adaptive = lapply(1:4, function(i)
+fragments_table = lapply(1:3, function(i)
 {
-  get_experiment_table(total_exp_adaptive$`H1_inverted:_FALSE`, total_exp_adaptive$`H1_inverted:_TRUE`, H1_inverted_FALSE_sig, H1_inverted_TRUE_sig, H1_inverted_FALSE_res, H1_inverted_TRUE_res, i, data_H1)
-})
-
-stomach_fragments_table_adaptive = lapply(1:4, function(i)
-{
-  get_experiment_table(total_exp_adaptive$`stomach_inverted:_FALSE`, total_exp_adaptive$`stomach_inverted:_TRUE`, stomach_inverted_FALSE_sig, stomach_inverted_TRUE_sig, stomach_inverted_FALSE_res, stomach_inverted_TRUE_res, i, data_stomach)
+  get_experiment_table(experiment$`stomach_inverted:_FALSE`, experiment$`stomach_inverted:_TRUE`, inverted_FALSE_sig, inverted_TRUE_sig, inverted_FALSE_res, inverted_TRUE_res, i, data)
 })
 
 
-save(H1_fragments_table_adaptive, file = "../../Rexperiments/H1_fragments_table_adaptive.Rdata")
-save(stomach_fragments_table_adaptive, file = "../../Rexperiments/stomach_fragments_table_adaptive.Rdata")
+save(fragments_table, file = filename)
 
 ##############################################################################################
 

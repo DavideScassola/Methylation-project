@@ -1,4 +1,4 @@
-MSR and expression
+MSR and expression for stomach, windows of 1000 sites
 ================
 
 Here I will investigate if there is a relationship between the presence of genes and genes expression in a certain genomic region and the MSR (with some of its derivate statistics).
@@ -67,33 +67,33 @@ First let's see if there are pairwise correlations between the features.
 
 ###### Basic features:
 
-![](MSR_and_expression_files/figure-markdown_github/unnamed-chunk-6-1.png)
+![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-6-1.png)
 
 log(TPM) is considered only for fragments with at least a gene.
 
 ###### Comparison with simple MSR statistics:
 
-![](MSR_and_expression_files/figure-markdown_github/unnamed-chunk-7-1.png)
+![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-7-1.png)
 
 ###### Comparison with other MSR statistics:
 
-![](MSR_and_expression_files/figure-markdown_github/unnamed-chunk-8-1.png)
+![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-8-1.png)
 
-inverted msr vs log(tpm): ![](MSR_and_expression_files/figure-markdown_github/unnamed-chunk-9-1.png)
+inverted msr vs log(tpm): ![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-9-1.png)
 
 #### Predicting gene presence
 
 Check if features can predict gene presence:
 
-![](MSR_and_expression_files/figure-markdown_github/unnamed-chunk-10-1.png)
+![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-10-1.png)
 
-![](MSR_and_expression_files/figure-markdown_github/unnamed-chunk-11-1.png)
+![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-11-1.png)
 
-![](MSR_and_expression_files/figure-markdown_github/unnamed-chunk-12-1.png)
+![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-12-1.png)
 
-![](MSR_and_expression_files/figure-markdown_github/unnamed-chunk-13-1.png)
+![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-13-1.png)
 
-![](MSR_and_expression_files/figure-markdown_github/unnamed-chunk-14-1.png)
+![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-14-1.png)
 
 The fraction of fragments that have at least one gene inside is
 
@@ -123,7 +123,7 @@ Adding other predictors doesn't significantly improve the accuracy.
 
 #### Predicting log(TPM)
 
-Distribution of TPM values (only for regions that contains some genes) ![](MSR_and_expression_files/figure-markdown_github/unnamed-chunk-18-1.png)
+Distribution of TPM values (only for regions that contains some genes) ![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-18-1.png)
 
 Linear model for TPM with standard predictors:
 

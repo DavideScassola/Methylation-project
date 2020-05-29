@@ -1,5 +1,5 @@
 ---
-title: "MSR and expression"
+title: "MSR and expression for stomach, windows of 1000 sites"
 output: github_document
 ---
 

@@ -683,29 +683,33 @@ make_rna_window_data_frame <- function(wgbs_data, rna_data, genebody_annotation,
   i_starting_points <- ((0:(fragments-1))*window)+1
   
   window = i_starting_points[2]-i_starting_points[1]
-  start_positions = wgbs_data[i_starting_points]$Cpos
+  start_position = wgbs_data[i_starting_points]$Cpos
   start_chr = wgbs_data[i_starting_points]$chr
-  end_positions = wgbs_data[i_starting_points+window]$Cpos
+  end_position = wgbs_data[i_starting_points+window]$Cpos
   #end_chr = wgbs_data[i_starting_points+window]$chr
-  l = length(start_positions)
+  l = length(start_position)
   
   rna_data = rna_data[gene_id %in% genebody_annotation$id]
   
   gene_info = sapply(1:l, function(i)
   {
-    cat(i, " ")
-    genes = get_genes_by_region(start_chr[i], start_positions[i], end_positions[i], genebody_annotation)
-    genes_nucleotides_count <- get_genes_nucleotides_intersection(start_chr[i], start_positions[i], end_positions[i], genebody_annotation)
+    if((i %% floor(l/100)) == 0)
+      cat(floor(100*i/l), "%  ")
+    
+    genes = get_genes_by_region(start_chr[i], start_position[i], end_position[i], genebody_annotation)
+    genes_nucleotides_count <- get_genes_nucleotides_intersection(start_chr[i], start_position[i], end_position[i], genebody_annotation)
     tpm = get_TPM(genes, rna_data)
     total_TPM = sum(tpm)
-    c(length(genes), sum(tpm), genes_nucleotides_count)
+    std_TPM = sd(tpm)
+
+    c(length(genes), total_TPM, genes_nucleotides_count, std_TPM)
   })
   
-  nucleotides = end_positions-start_positions
+  nucleotides = end_position-start_position
   nucleotides[nucleotides<=0] = NA
-  
+
   data.frame(start_chr, start_position, end_position,
-             nucleotides, gene_count = gene_info[1,], genes_nucleotides_count = gene_info[3,], total_TPM = gene_info[2,])
+             nucleotides, gene_count = gene_info[1,], genes_nucleotides_count = gene_info[3,], total_TPM = gene_info[2,], std_TPM = gene_info[4,])
 }
 
 make_msr_rna_data_frame <- function(wgbs_data, rna_data, genebody_annotation, msr_experiment_data_frame)
@@ -729,6 +733,7 @@ make_msr_rna_data_frame <- function(wgbs_data, rna_data, genebody_annotation, ms
     genes_nucleotides_count <- get_genes_nucleotides_intersection(start_chr[i], start_positions[i], end_positions[i], genebody_annotation)
     tpm = get_TPM(genes, rna_data)
     total_TPM = sum(tpm)
+    
     c(length(genes), sum(tpm), genes_nucleotides_count)
   })
   
@@ -746,25 +751,29 @@ make_msr_rna_data_frame <- function(wgbs_data, rna_data, genebody_annotation, ms
 join_rna_and_msr_tables <- function(rna_tables, msr_tables, i)
 {
   df = cbind(rna_tables[[i]], msr_tables[[i]])
+  l = length(colnames(rna_tables[[i]]))
   
   df$log_tpm = log(df$total_TPM+ 1e-3)
+  df$log_std_tpm = log(df$std_TPM)
   
-  colnames(df)[8] <- "i_start"
-  colnames(df)[10] <- "meth rate"
-  colnames(df)[13] <- "ecdf"
-  colnames(df)[14] <- "inverted ecdf"
+  colnames(df)[l+1] <- "i_start"
+  colnames(df)[l+3] <- "meth rate"
+  colnames(df)[l+6] <- "ecdf"
+  colnames(df)[l+7] <- "inverted ecdf"
   
   df$CpG_density = (df$i_start[2]-df$i_start[1])/df$nucleotides
   
   df
 }
 
-produce_fragments_rna_tables <- function(wgbs_data, rna_data, genebody_annotation, sizes = c(1e3,1e4,1e5,1e6))
+produce_fragments_rna_tables <- function(wgbs_data, rna_data, genebody_annotation, sizes = c(1e3,1e4,1e5,1e6), file = "")
 {
   tables = lapply(sizes, function(window)
   {
     make_rna_window_data_frame(wgbs_data, rna_data, genebody_annotation, window)
   })
+  if(nchar(file>1))
+    saveRDS(tables, file = file)
   return(tables)
 }
 

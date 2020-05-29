@@ -1,5 +1,5 @@
 ---
-title: "MSR and expression"
+title: "MSR and expression for H1, windows of 1000 sites"
 output: github_document
 ---
 
@@ -20,17 +20,9 @@ source("Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
 
 
 ##########################
-load("Rexperiments/stomach_fragments_table_stoc_V2.Rdata")
-load("Rexperiments/stomach_fragments_table_discrete_V2.Rdata")
-load("Rexperiments/stomach_fragments_table_adaptive_V2.Rdata")
-
 load("Rexperiments/H1_fragments_table_stoc_V2.Rdata")
 load("Rexperiments/H1_fragments_table_discrete_V2.Rdata")
 load("Rexperiments/H1_fragments_table_adaptive_V2.Rdata")
-
-load("Rexperiments/K562_fragments_table_stoc_V2.Rdata")
-load("Rexperiments/K562_fragments_table_discrete_V2.Rdata")
-load("Rexperiments/K562_fragments_table_adaptive_V2.Rdata")
 
 genebody = readRDS("Rexperiments/genebody_improved.Rda")
 #########################
@@ -46,24 +38,24 @@ msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
 
 ```{r, include=FALSE}
 setwd(dir = "../../../")
-rna <- read_rna_file("MethylationCode/MethylationData/rna-seq/ENCFF918KPC_stomach.tsv")
-data <- sum_strands(readRDS("MethylationCode/MethylationData/wgbs/stomach.Rda"))
-msr_fragments_table = stomach_fragments_table_discrete
-rna_fragment_tables = readRDS("Rexperiments/stomach_rna_fragment_tables.Rda")
+rna <- read_rna_file("MethylationCode/MethylationData/rna-seq/ENCFF653XHG_H1.tsv")
+data <- sum_strands(readRDS("MethylationCode/MethylationData/wgbs/H1.Rda"))
+msr_fragments_table = fragments_table
+rna_fragment_tables = readRDS("Rexperiments/H1_rna_fragment_tables.Rda")
 wsize = 1
 #########################
 ```
 
 Here I will investigate if there is a relationship between the presence of genes and genes expression in a certain genomic region and the MSR (with some of its derivate statistics).
 
-I chose stomach cells data in order to do this, and CpG windows of size 1000, that corresponds to a variable window size in term of nucleotides (on average about 100,000).
+I chose H1 cells data in order to do this, and CpG windows of size 1000, that corresponds to a variable window size in term of nucleotides (on average about 100,000).
 
 
 This is an example of total-rna-seq file, that shows for each "gene" its transcripts and some measures of expression. In this case I just kept two colums.
 The first one indicates the "gene"", the second one is the Transcript Per Million that is a relative measure of how much a gene is expressed.
 
 ```{r, echo=FALSE}
-#stomach_rna
+#H1_rna
 rna[nchar(gene_id)>6]
 ```
 
