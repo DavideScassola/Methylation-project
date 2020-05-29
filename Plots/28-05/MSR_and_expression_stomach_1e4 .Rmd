@@ -58,7 +58,7 @@ wsize = 2
 
 Here I will investigate if there is a relationship between the presence of genes and genes expression in a certain genomic region and the MSR (with some of its derivate statistics).
 
-I chose stomach cells data in order to do this, and CpG windows of size 1000, that corresponds to a variable window size in term of nucleotides (on average about 100,000).
+I chose stomach cells data in order to do this, and CpG windows of size 10,000, that corresponds to a variable window size in term of nucleotides (on average about 1,000,000).
 
 
 This is an example of total-rna-seq file, that shows for each "gene" its transcripts and some measures of expression. In this case I just kept two colums.
@@ -79,7 +79,7 @@ The number of genes is much less than the ones in the total-rna-seq file, since 
 
 
 So the final dataFrame is the following (excluding some columns for readability):
-```{r, echo=FALSE}
+```{r include=FALSE}
 data_table <- join_rna_and_msr_tables(rna_fragment_tables, msr_fragments_table, wsize)
 
 #data_table <- exclude_outliers(data_table, lim = 2.5e5)
@@ -88,9 +88,12 @@ data_table$log_std_tpm[is.infinite(data_table$log_std_tpm)] = NA
 
 #data_table$log_std_tpm = data_table$log_std_tpm + log(data_table$gene_count-1) - log(data_table$gene_count)
 
-data_table$std_TPM = data_table$std_TPM * sqrt((data_table$gene_count-1)/ (data_table$gene_count))
+data_table[data_table$gene_count>0, ]$std_TPM = data_table[data_table$gene_count>0, ]$std_TPM * sqrt((data_table[data_table$gene_count>0, ]$gene_count-1)/ (data_table[data_table$gene_count>0, ]$gene_count))
 
 data_table <- exclude_outliers(data_table, lim = 2.5e6)
+```
+
+```{r, echo=FALSE}
 head(data_table[complete.cases(data_table), c(1,2,3,5,7,11)])
 ```
 
@@ -98,7 +101,7 @@ The full scheme includes:
 
 **nucleotides**: number of nucleotides in the window
 
-**CpG density**: fraction of nucleotides that is a C of a CpG site (= 1000/nucleotides)
+**CpG density**: fraction of nucleotides that is a C of a CpG site (= 10000/nucleotides)
 
 **meth rate**: ratio of methylated CpG sites
 
@@ -203,7 +206,7 @@ actual = glm.fit$data$gene_count
 Poisson Regression Model with several predictors
 ```{r, echo=FALSE}
 model_data = (data_table[, c("gene_count", basic_predictors, msr_predictors)])
-#model_data = model_data[complete.cases(model_data),]
+model_data = model_data[complete.cases(model_data),]
 glm.fit <- glm(gene_count ~ . , data = model_data, family = "poisson")
 
 summary(glm.fit)
@@ -211,17 +214,22 @@ summary(glm.fit)
 probabilities = predict(glm.fit, type="response")
 prediction = (probabilities)
 actual = glm.fit$data$gene_count
-hist(prediction-actual, col = alpha(1, 0.4), main = "error distribution", breaks = 50, xlab= "prediction-actual")
 
+hist(abs(prediction-actual), main = "Error distribution compared with data", breaks = 100, xlab= "prediction-actual", probability = T, col = alpha(5, 0.7))
+hist(actual, main = "error distribution", breaks = 50, xlab= "gene_count", col = alpha(2, 0.5), probability = T, add=T)
+
+#hist(prediction-actual, col = alpha(1, 0.4), main = "error distribution", breaks = 50, xlab= "prediction-actual")
+colors = c(alpha(5, 0.5), alpha(2, 0.5))
+legend("right", col = colors, legend = c("prediction error","gene count"), fill = colors)
 ```
 
 
 #### Predicting log(TPM)
 
-Distribution of TPM values (only for regions that contains some genes)
+Distribution of TPM values (only for regions that contains some genes).
 ```{r, echo=FALSE}
 
-hist(log(data_table[data_table$gene_count>0, ]$total_TPM+1e-3, base = 10), xlab = "log(TPM + 1e-3)", main = "", breaks = 50)
+hist(data_table[data_table$gene_count>0,]$log_tpm, xlab = "log(TPM)", main = "", breaks = 50)
 ```
 
 
@@ -230,20 +238,26 @@ Linear model for log(TPM) with standard predictors:
 ```{r, echo=FALSE}
 to_predict = "log_tpm"
 gene_presence = data_table$gene_count>0
-model_data = (data_table[gene_presence,])
+model_data = (data_table[gene_presence, c(to_predict, basic_predictors, "gene_count")])
 
 #model_data = model_data[complete.cases(model_data),]
 
-model = lm(log_tpm ~ . , data = model_data[, c(to_predict, basic_predictors, "gene_count")])
+model = lm(log_tpm ~ . , data = model_data)
 summary(model)
 
 ```
 
 Linear model for TPM with all features and MSR statistics:
 ```{r, echo=FALSE}
-model = lm(log_tpm ~ . , model_data[, c(to_predict, basic_predictors, msr_predictors, "gene_count", "genes_nucleotides_count")])
+model_data = (data_table[gene_presence, c(to_predict, basic_predictors, msr_predictors, "gene_count", "genes_nucleotides_count")])
+model = lm(log_tpm ~ . , model_data)
 summary(model)
-hist(model$fitted.values-model$model$log_tpm, main = "error distribution", breaks = 50, xlab= "prediction-actual")
+
+hist((model$fitted.values-model$model$log_tpm), main = "Error distribution compared with centered data", breaks = 100, xlab= "prediction-actual", probability = F, col = alpha(5, 1))
+hist(model$model$log_tpm-mean(model$model$log_tpm), breaks = 50, xlab= "log(tpm)", col = alpha(2, 0.4), probability = F, add=T)
+
+colors = c(alpha(5, 0.5), alpha(2, 0.5))
+legend("right", col = colors, legend = c("prediction error","centered log(tpm)"), fill = colors)
 ```
 
 Linear model for TPM with all features and MSR statistics, without information about genes:

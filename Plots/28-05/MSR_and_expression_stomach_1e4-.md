@@ -3,7 +3,7 @@ MSR and expression, for stomach cells and window size of 10,000
 
 Here I will investigate if there is a relationship between the presence of genes and genes expression in a certain genomic region and the MSR (with some of its derivate statistics).
 
-I chose stomach cells data in order to do this, and CpG windows of size 1000, that corresponds to a variable window size in term of nucleotides (on average about 100,000).
+I chose stomach cells data in order to do this, and CpG windows of size 10,000, that corresponds to a variable window size in term of nucleotides (on average about 1,000,000).
 
 This is an example of total-rna-seq file, that shows for each "gene" its transcripts and some measures of expression. In this case I just kept two colums. The first one indicates the "gene"", the second one is the Transcript Per Million that is a relative measure of how much a gene is expressed.
 
@@ -39,11 +39,6 @@ The number of genes is much less than the ones in the total-rna-seq file, since 
 
 So the final dataFrame is the following (excluding some columns for readability):
 
-    ## Warning in sqrt((data_table$gene_count - 1)/(data_table$gene_count)): Si è
-    ## prodotto un NaN
-
-    ## 8 rows had too many nucleotides
-
     ##   start_chr start_position end_position gene_count total_TPM meth rate
     ## 2      chr1         921648      1151546         10     12.65 0.5677261
     ## 3      chr1        1151546      1390325         17     32.56 0.6524979
@@ -56,7 +51,7 @@ The full scheme includes:
 
 **nucleotides**: number of nucleotides in the window
 
-**CpG density**: fraction of nucleotides that is a C of a CpG site (= 1000/nucleotides)
+**CpG density**: fraction of nucleotides that is a C of a CpG site (= 10000/nucleotides)
 
 **meth rate**: ratio of methylated CpG sites
 
@@ -70,32 +65,32 @@ First let's see if there are pairwise correlations between the features.
 
 ###### Basic features:
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-6-1.png)
+![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-7-1.png)
 
 log(TPM) is considered only for fragments with at least a gene.
 
 ###### Comparison with simple MSR statistics:
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-7-1.png)
+![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-8-1.png)
 
 ###### Comparison with other MSR statistics:
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-8-1.png)
-
 ![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-9-1.png)
+
+![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-10-1.png)
 
 The correlation between the total TPM with the standard deviation of the TPM is:
 
     ##      cor 
     ## 0.892561
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-11-1.png)
-
 ![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-12-1.png)
+
+![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-13-1.png)
 
 #### Predicting gene number
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-13-1.png)
+![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-14-1.png)
 
 Poisson regression for gene number with basic predictors (nucleotides, CpG\_density, meth rate):
 
@@ -180,26 +175,21 @@ Poisson Regression Model with several predictors
     ## 
     ##     Null deviance: 12961.3  on 2766  degrees of freedom
     ## Residual deviance:  7480.8  on 2758  degrees of freedom
-    ##   (140 observations deleted due to missingness)
     ## AIC: 16809
     ## 
     ## Number of Fisher Scoring iterations: 5
 
-    ## Warning in prediction - actual: longer object length is not a multiple of
-    ## shorter object length
-
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-16-1.png)
+![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-17-1.png)
 
 #### Predicting log(TPM)
 
-Distribution of TPM values (only for regions that contains some genes) ![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-17-1.png)
+Distribution of TPM values (only for regions that contains some genes). ![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-18-1.png)
 
 Linear model for log(TPM) with standard predictors:
 
     ## 
     ## Call:
-    ## lm(formula = log_tpm ~ ., data = model_data[, c(to_predict, basic_predictors, 
-    ##     "gene_count")])
+    ## lm(formula = log_tpm ~ ., data = model_data)
     ## 
     ## Residuals:
     ##      Min       1Q   Median       3Q      Max 
@@ -224,8 +214,7 @@ Linear model for TPM with all features and MSR statistics:
 
     ## 
     ## Call:
-    ## lm(formula = log_tpm ~ ., data = model_data[, c(to_predict, basic_predictors, 
-    ##     msr_predictors, "gene_count", "genes_nucleotides_count")])
+    ## lm(formula = log_tpm ~ ., data = model_data)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
@@ -253,7 +242,7 @@ Linear model for TPM with all features and MSR statistics:
     ## Multiple R-squared:  0.4486, Adjusted R-squared:  0.4464 
     ## F-statistic: 210.9 on 10 and 2593 DF,  p-value: < 2.2e-16
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-19-1.png)
+![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-20-1.png)
 
 Linear model for TPM with all features and MSR statistics, without information about genes:
 
