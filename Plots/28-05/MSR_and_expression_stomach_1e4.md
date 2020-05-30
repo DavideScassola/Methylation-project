@@ -92,7 +92,7 @@ The correlation between the total TPM with the standard deviation of the TPM is:
 
 ![](MSR_and_expression_stomach_1e4_files/figure-markdown_github/unnamed-chunk-14-1.png)
 
-Negative binomial for gene number with basic predictors (nucleotides, CpG\_density, meth rate):
+Negative binomial regression for gene number with basic predictors (nucleotides, CpG\_density, meth rate):
 
     ## 
     ## Call:
@@ -127,7 +127,7 @@ Negative binomial for gene number with basic predictors (nucleotides, CpG\_densi
     ## 
     ##  2 x log-likelihood:  -16257.6530
 
-Negative binomial regression Model with inverted\_msr as predictor
+Negative binomial regression with inverted\_msr as predictor
 
     ## 
     ## Call:
@@ -159,7 +159,7 @@ Negative binomial regression Model with inverted\_msr as predictor
     ## 
     ##  2 x log-likelihood:  -15526.564
 
-Negative Binomial Regression Model with several predictors
+Negative Binomial Regression with several predictors
 
     ## 
     ## Call:
