@@ -65,125 +65,145 @@ First let's see if there are pairwise correlations between the features.
 
 ###### Basic features:
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-7-1.png)
+![](MSR_and_expression_stomach_1e4_files/figure-markdown_github/unnamed-chunk-7-1.png)
 
 log(TPM) is considered only for fragments with at least a gene.
 
 ###### Comparison with simple MSR statistics:
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-8-1.png)
+![](MSR_and_expression_stomach_1e4_files/figure-markdown_github/unnamed-chunk-8-1.png)
 
 ###### Comparison with other MSR statistics:
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-9-1.png)
+![](MSR_and_expression_stomach_1e4_files/figure-markdown_github/unnamed-chunk-9-1.png)
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-10-1.png)
+![](MSR_and_expression_stomach_1e4_files/figure-markdown_github/unnamed-chunk-10-1.png)
 
 The correlation between the total TPM with the standard deviation of the TPM is:
 
     ##      cor 
     ## 0.892561
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-12-1.png)
+![](MSR_and_expression_stomach_1e4_files/figure-markdown_github/unnamed-chunk-12-1.png)
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-13-1.png)
+![](MSR_and_expression_stomach_1e4_files/figure-markdown_github/unnamed-chunk-13-1.png)
 
 #### Predicting gene number
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-14-1.png)
+![](MSR_and_expression_stomach_1e4_files/figure-markdown_github/unnamed-chunk-14-1.png)
 
-Poisson regression for gene number with basic predictors (nucleotides, CpG\_density, meth rate):
+Negative binomial for gene number with basic predictors (nucleotides, CpG\_density, meth rate):
 
     ## 
     ## Call:
-    ## glm(formula = model_data$gene_count ~ nucleotides + CpG_density + 
-    ##     `meth rate`, family = "poisson", data = model_data)
+    ## glm.nb(formula = model_data$gene_count ~ nucleotides + CpG_density + 
+    ##     `meth rate`, data = model_data, init.theta = 2.360023795, 
+    ##     link = log)
     ## 
     ## Deviance Residuals: 
-    ##    Min      1Q  Median      3Q     Max  
-    ## -7.188  -1.446  -0.301   0.887  13.107  
+    ##     Min       1Q   Median       3Q      Max  
+    ## -3.4647  -0.8359  -0.1575   0.4520   5.0829  
     ## 
     ## Coefficients:
     ##               Estimate Std. Error z value Pr(>|z|)    
-    ## (Intercept)  7.444e+00  1.221e-01   60.97   <2e-16 ***
-    ## nucleotides -9.305e-07  3.844e-08  -24.20   <2e-16 ***
-    ## CpG_density -3.425e+01  2.244e+00  -15.27   <2e-16 ***
-    ## `meth rate` -5.679e+00  1.396e-01  -40.68   <2e-16 ***
+    ## (Intercept)  8.034e+00  2.745e-01  29.267   <2e-16 ***
+    ## nucleotides -1.027e-06  7.245e-08 -14.170   <2e-16 ***
+    ## CpG_density -4.230e+01  4.712e+00  -8.977   <2e-16 ***
+    ## `meth rate` -6.212e+00  3.168e-01 -19.610   <2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## (Dispersion parameter for poisson family taken to be 1)
+    ## (Dispersion parameter for Negative Binomial(2.36) family taken to be 1)
     ## 
-    ##     Null deviance: 14051  on 2883  degrees of freedom
-    ## Residual deviance: 10605  on 2880  degrees of freedom
-    ## AIC: 20097
+    ##     Null deviance: 4187.9  on 2883  degrees of freedom
+    ## Residual deviance: 3286.1  on 2880  degrees of freedom
+    ## AIC: 16268
     ## 
-    ## Number of Fisher Scoring iterations: 5
+    ## Number of Fisher Scoring iterations: 1
+    ## 
+    ## 
+    ##               Theta:  2.3600 
+    ##           Std. Err.:  0.0910 
+    ## 
+    ##  2 x log-likelihood:  -16257.6530
 
-Poisson regression Model with inverted\_msr as predictor
+Negative binomial regression Model with inverted\_msr as predictor
 
     ## 
     ## Call:
-    ## glm(formula = model_data$gene_count ~ model_data$inverted_msr, 
-    ##     family = "poisson", data = model_data)
+    ## glm.nb(formula = model_data$gene_count ~ model_data$inverted_msr, 
+    ##     data = model_data, init.theta = 2.753414566, link = log)
     ## 
     ## Deviance Residuals: 
     ##     Min       1Q   Median       3Q      Max  
-    ## -4.9991  -1.4908  -0.4799   0.6939  14.8572  
+    ## -2.8162  -0.8493  -0.2670   0.3648   7.0595  
     ## 
     ## Coefficients:
-    ##                          Estimate Std. Error z value Pr(>|z|)    
-    ## (Intercept)               6.92648    0.08308   83.38   <2e-16 ***
-    ## model_data$inverted_msr -20.09757    0.33976  -59.15   <2e-16 ***
+    ##                         Estimate Std. Error z value Pr(>|z|)    
+    ## (Intercept)               7.4171     0.1709   43.39   <2e-16 ***
+    ## model_data$inverted_msr -22.0763     0.6825  -32.34   <2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## (Dispersion parameter for poisson family taken to be 1)
+    ## (Dispersion parameter for Negative Binomial(2.7534) family taken to be 1)
     ## 
-    ##     Null deviance: 12961.3  on 2766  degrees of freedom
-    ## Residual deviance:  9562.1  on 2765  degrees of freedom
-    ## AIC: 18876
+    ##     Null deviance: 4090.9  on 2766  degrees of freedom
+    ## Residual deviance: 3078.7  on 2765  degrees of freedom
+    ## AIC: 15533
     ## 
-    ## Number of Fisher Scoring iterations: 5
+    ## Number of Fisher Scoring iterations: 1
+    ## 
+    ## 
+    ##               Theta:  2.753 
+    ##           Std. Err.:  0.110 
+    ## 
+    ##  2 x log-likelihood:  -15526.564
 
-Poisson Regression Model with several predictors
+Negative Binomial Regression Model with several predictors
 
     ## 
     ## Call:
-    ## glm(formula = gene_count ~ ., family = "poisson", data = model_data)
+    ## glm.nb(formula = gene_count ~ ., data = model_data, init.theta = 4.191147656, 
+    ##     link = log)
     ## 
     ## Deviance Residuals: 
     ##     Min       1Q   Median       3Q      Max  
-    ## -6.8874  -1.1790  -0.3495   0.6548  15.0779  
+    ## -4.3272  -0.7845  -0.2033   0.3758   8.4455  
     ## 
     ## Coefficients: (1 not defined because of singularities)
     ##                     Estimate Std. Error z value Pr(>|z|)    
-    ## (Intercept)       -5.104e+01  2.138e+00 -23.871  < 2e-16 ***
-    ## nucleotides       -3.407e-08  4.613e-08  -0.739 0.460206    
-    ## CpG_density       -1.410e+01  2.312e+00  -6.100 1.06e-09 ***
-    ## `meth rate`        2.550e+01  9.779e-01  26.077  < 2e-16 ***
-    ## msr                2.082e+02  7.197e+00  28.926  < 2e-16 ***
-    ## inverted_msr      -1.839e+01  1.274e+00 -14.436  < 2e-16 ***
-    ## ecdf               1.971e-01  5.680e-02   3.470 0.000521 ***
-    ## `inverted ecdf`    5.795e-02  4.465e-02   1.298 0.194279    
-    ## residual          -1.826e+02  7.462e+00 -24.474  < 2e-16 ***
+    ## (Intercept)       -6.864e+01  3.590e+00 -19.119  < 2e-16 ***
+    ## nucleotides        1.224e-07  7.476e-08   1.637   0.1017    
+    ## CpG_density       -1.855e+01  4.136e+00  -4.485 7.30e-06 ***
+    ## `meth rate`        3.273e+01  1.597e+00  20.499  < 2e-16 ***
+    ## msr                2.716e+02  1.213e+01  22.384  < 2e-16 ***
+    ## inverted_msr      -1.706e+01  2.216e+00  -7.700 1.36e-14 ***
+    ## ecdf               1.882e-01  9.802e-02   1.920   0.0548 .  
+    ## `inverted ecdf`    9.660e-02  7.458e-02   1.295   0.1952    
+    ## residual          -2.444e+02  1.290e+01 -18.950  < 2e-16 ***
     ## inverted_residual         NA         NA      NA       NA    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## (Dispersion parameter for poisson family taken to be 1)
+    ## (Dispersion parameter for Negative Binomial(4.1911) family taken to be 1)
     ## 
-    ##     Null deviance: 12961.3  on 2766  degrees of freedom
-    ## Residual deviance:  7480.8  on 2758  degrees of freedom
-    ## AIC: 16809
+    ##     Null deviance: 5214.5  on 2766  degrees of freedom
+    ## Residual deviance: 2965.3  on 2758  degrees of freedom
+    ## AIC: 14730
     ## 
-    ## Number of Fisher Scoring iterations: 5
+    ## Number of Fisher Scoring iterations: 1
+    ## 
+    ## 
+    ##               Theta:  4.191 
+    ##           Std. Err.:  0.190 
+    ## 
+    ##  2 x log-likelihood:  -14709.734
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-17-1.png)
+![](MSR_and_expression_stomach_1e4_files/figure-markdown_github/unnamed-chunk-17-1.png)
 
 #### Predicting log(TPM)
 
-Distribution of TPM values (only for regions that contains some genes). ![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-18-1.png)
+Distribution of TPM values (only for regions that contains some genes). ![](MSR_and_expression_stomach_1e4_files/figure-markdown_github/unnamed-chunk-18-1.png)
 
 Linear model for log(TPM) with standard predictors:
 
@@ -242,7 +262,7 @@ Linear model for TPM with all features and MSR statistics:
     ## Multiple R-squared:  0.4486, Adjusted R-squared:  0.4464 
     ## F-statistic: 210.9 on 10 and 2593 DF,  p-value: < 2.2e-16
 
-![](MSR_and_expression_stomach_1e4-_files/figure-markdown_github/unnamed-chunk-20-1.png)
+![](MSR_and_expression_stomach_1e4_files/figure-markdown_github/unnamed-chunk-20-1.png)
 
 Linear model for TPM with all features and MSR statistics, without information about genes:
 

@@ -166,7 +166,7 @@ hist(data_table$gene_count, main = sprintf("number of genes in a fragment, mean:
 
 
 
-Poisson regression for gene number with basic predictors (nucleotides, CpG_density, meth rate):
+Negative binomial for gene number with basic predictors (nucleotides, CpG_density, meth rate):
 
 ```{r, echo=FALSE}
 library("MASS")
@@ -174,48 +174,48 @@ library("MASS")
 # Logistics Regression
 model_data = (data_table[, c("nucleotides", "CpG_density", "meth rate", "gene_count")])
 model_data = model_data[complete.cases(model_data),]
-glm.fit <- glm(model_data$gene_count ~ nucleotides+CpG_density+`meth rate`, data = model_data, family = "poisson")
+glm.fit <- glm.nb(model_data$gene_count ~ nucleotides+CpG_density+`meth rate`, data = model_data)
 
 
 summary(glm.fit)
 
 probabilities = predict(glm.fit, type="response")
 prediction = (probabilities)
-actual = glm.fit$data$gene_count
+actual = model_data$gene_count
 #plot(prediction-actual, col = alpha(1, 0.2))
 
 ```
 
 
-Poisson regression Model with inverted_msr as predictor
+Negative binomial regression Model with inverted_msr as predictor
 ```{r, echo=FALSE}
 model_data = (data_table[, c("inverted_msr", "gene_count")])
 model_data = model_data[complete.cases(model_data),]
-glm.fit <- glm(model_data$gene_count ~ model_data$inverted_msr , data = model_data, , family = "poisson")
+glm.fit <- glm.nb(model_data$gene_count ~ model_data$inverted_msr , data = model_data)
 
 summary(glm.fit)
 
 probabilities = predict(glm.fit, type="response")
 prediction = (probabilities)
-actual = glm.fit$data$gene_count
+actual = model_data$gene_count
 #plot(prediction-actual, col = alpha(1, 0.2))
 
 ```
 
 
-Poisson Regression Model with several predictors
+Negative Binomial Regression Model with several predictors
 ```{r, echo=FALSE}
 model_data = (data_table[, c("gene_count", basic_predictors, msr_predictors)])
 model_data = model_data[complete.cases(model_data),]
-glm.fit <- glm(gene_count ~ . , data = model_data, family = "poisson")
+glm.fit <- glm.nb(gene_count ~ . , data = model_data)
 
 summary(glm.fit)
 
 probabilities = predict(glm.fit, type="response")
-prediction = (probabilities)
-actual = glm.fit$data$gene_count
+probabilities = (probabilities)
+actual = model_data$gene_count
 
-hist(abs(prediction-actual), main = "Error distribution compared with data", breaks = 100, xlab= "prediction-actual", probability = T, col = alpha(5, 0.7))
+hist(abs(prediction-actual), main = "Error distribution compared with data", breaks = 50, xlab= "prediction-actual", probability = T, col = alpha(5, 0.7))
 hist(actual, main = "error distribution", breaks = 50, xlab= "gene_count", col = alpha(2, 0.5), probability = T, add=T)
 
 #hist(prediction-actual, col = alpha(1, 0.4), main = "error distribution", breaks = 50, xlab= "prediction-actual")
