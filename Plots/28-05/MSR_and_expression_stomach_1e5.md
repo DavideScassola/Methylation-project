@@ -86,7 +86,7 @@ The correlation between the total TPM with the standard deviation of the TPM is:
 
 ![](MSR_and_expression_stomach_1e5_files/figure-markdown_github/unnamed-chunk-12-1.png)
 
-Negative binomial regrssion for gene number with basic predictors (nucleotides, CpG\_density, meth rate):
+Negative binomial for gene number with basic predictors (nucleotides, CpG\_density, meth rate):
 
     ## 
     ## Call:
@@ -121,7 +121,7 @@ Negative binomial regrssion for gene number with basic predictors (nucleotides, 
     ## 
     ##  2 x log-likelihood:  -2460.080
 
-Negative binomial regression with inverted\_msr as predictor
+Negative binomial regression Model with inverted\_msr as predictor
 
     ## 
     ## Call:
@@ -169,22 +169,24 @@ Linear model for log(TPM) with standard predictors:
     ## 
     ## Residuals:
     ##      Min       1Q   Median       3Q      Max 
-    ## -2.12882 -0.30081 -0.01989  0.33625  1.97238 
+    ## -1.56232 -0.31645 -0.03292  0.32842  1.68256 
     ## 
     ## Coefficients:
-    ##               Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  2.901e+00  1.744e+00   1.664  0.09737 .  
-    ## nucleotides -7.071e-08  2.653e-08  -2.665  0.00817 ** 
-    ## CpG_density -2.687e+01  2.206e+01  -1.218  0.22415    
-    ## `meth rate`  1.434e+00  2.060e+00   0.696  0.48710    
-    ## gene_count   1.566e-02  1.262e-03  12.412  < 2e-16 ***
+    ##                           Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)              5.204e+00  1.695e+00   3.069  0.00237 ** 
+    ## nucleotides             -7.860e-08  2.625e-08  -2.994  0.00302 ** 
+    ## CpG_density             -2.742e+00  2.087e+01  -0.131  0.89558    
+    ## `meth rate`             -7.416e+00  6.290e+00  -1.179  0.23949    
+    ## gene_count               1.189e-02  1.455e-03   8.173 1.32e-14 ***
+    ## genes_nucleotides_count  1.662e-07  2.566e-08   6.478 4.63e-10 ***
+    ## msr_density              4.387e+00  5.783e+00   0.759  0.44876    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 0.5761 on 262 degrees of freedom
+    ## Residual standard error: 0.5364 on 260 degrees of freedom
     ##   (23 observations deleted due to missingness)
-    ## Multiple R-squared:  0.5517, Adjusted R-squared:  0.5448 
-    ## F-statistic:  80.6 on 4 and 262 DF,  p-value: < 2.2e-16
+    ## Multiple R-squared:  0.6143, Adjusted R-squared:  0.6054 
+    ## F-statistic: 69.02 on 6 and 260 DF,  p-value: < 2.2e-16
 
 Linear model for TPM with all features and MSR statistics:
 
@@ -196,20 +198,21 @@ Linear model for TPM with all features and MSR statistics:
     ##      Min       1Q   Median       3Q      Max 
     ## -1.60555 -0.32192 -0.04405  0.31939  1.77125 
     ## 
-    ## Coefficients: (2 not defined because of singularities)
+    ## Coefficients: (3 not defined because of singularities)
     ##                           Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)             -7.230e+04  9.547e+04  -0.757   0.4496    
+    ## (Intercept)             -7.233e+04  9.547e+04  -0.758   0.4494    
     ## nucleotides             -6.677e-08  2.730e-08  -2.446   0.0151 *  
     ## CpG_density             -1.247e+00  2.202e+01  -0.057   0.9549    
     ## `meth rate`             -6.644e+00  6.865e+00  -0.968   0.3340    
-    ## msr                     -5.760e+01  4.791e+01  -1.202   0.2304    
+    ## gene_count               1.095e-02  1.482e-03   7.386 2.17e-12 ***
+    ## genes_nucleotides_count  1.339e-07  2.741e-08   4.885 1.83e-06 ***
+    ## msr_density              1.521e+01  9.589e+00   1.586   0.1139    
+    ## msr                      4.332e+01  2.603e+01   1.664   0.0974 .  
     ## inverted_msr            -3.879e+01  1.552e+01  -2.500   0.0131 *  
     ## ecdf                     7.233e+04  9.547e+04   0.758   0.4494    
     ## `inverted ecdf`                 NA         NA      NA       NA    
-    ## residual                 1.009e+02  6.361e+01   1.586   0.1139    
+    ## residual                        NA         NA      NA       NA    
     ## inverted_residual               NA         NA      NA       NA    
-    ## gene_count               1.095e-02  1.482e-03   7.386 2.17e-12 ***
-    ## genes_nucleotides_count  1.339e-07  2.741e-08   4.885 1.83e-06 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
@@ -225,13 +228,13 @@ Linear model for TPM with all features and MSR statistics, without information a
     ## 
     ## Call:
     ## lm(formula = log_tpm ~ ., data = model_data[, c(to_predict, basic_predictors, 
-    ##     msr_predictors)])
+    ##     msr_predictors, "msr_density")])
     ## 
     ## Residuals:
     ##      Min       1Q   Median       3Q      Max 
     ## -2.63098 -0.30540 -0.01777  0.36067  2.35308 
     ## 
-    ## Coefficients: (2 not defined because of singularities)
+    ## Coefficients: (3 not defined because of singularities)
     ##                     Estimate Std. Error t value Pr(>|t|)    
     ## (Intercept)       -2.242e+05  1.129e+05  -1.985 0.048161 *  
     ## nucleotides       -7.100e-08  3.277e-08  -2.167 0.031172 *  
@@ -243,6 +246,7 @@ Linear model for TPM with all features and MSR statistics, without information a
     ## `inverted ecdf`           NA         NA      NA       NA    
     ## residual          -5.730e+01  7.215e+01  -0.794 0.427833    
     ## inverted_residual         NA         NA      NA       NA    
+    ## msr_density               NA         NA      NA       NA    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 

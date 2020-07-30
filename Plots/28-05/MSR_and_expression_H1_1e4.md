@@ -215,22 +215,24 @@ Linear model for log(TPM) with standard predictors:
     ## 
     ## Residuals:
     ##      Min       1Q   Median       3Q      Max 
-    ## -10.4613  -0.6047   0.3071   1.0745   6.8786 
+    ## -10.1217  -0.6813   0.2189   1.0837   7.5911 
     ## 
     ## Coefficients:
-    ##               Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  1.012e+01  8.936e-01  11.322  < 2e-16 ***
-    ## nucleotides -2.102e-06  2.150e-07  -9.779  < 2e-16 ***
-    ## CpG_density -3.585e+01  1.290e+01  -2.779  0.00548 ** 
-    ## `meth rate` -6.249e+00  1.048e+00  -5.961 2.84e-09 ***
-    ## gene_count   1.535e-01  8.133e-03  18.874  < 2e-16 ***
+    ##                           Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)              7.915e+00  9.650e-01   8.203 3.63e-16 ***
+    ## nucleotides             -1.958e-06  2.178e-07  -8.990  < 2e-16 ***
+    ## CpG_density              4.898e+00  1.320e+01   0.371    0.711    
+    ## `meth rate`             -2.797e+01  5.272e+00  -5.305 1.22e-07 ***
+    ## gene_count               1.333e-01  8.249e-03  16.160  < 2e-16 ***
+    ## genes_nucleotides_count  1.904e-06  1.595e-07  11.932  < 2e-16 ***
+    ## msr_density              2.087e+01  5.090e+00   4.100 4.25e-05 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 2.064 on 2650 degrees of freedom
+    ## Residual standard error: 2 on 2648 degrees of freedom
     ##   (23 observations deleted due to missingness)
-    ## Multiple R-squared:  0.3612, Adjusted R-squared:  0.3602 
-    ## F-statistic: 374.6 on 4 and 2650 DF,  p-value: < 2.2e-16
+    ## Multiple R-squared:  0.4011, Adjusted R-squared:  0.3998 
+    ## F-statistic: 295.6 on 6 and 2648 DF,  p-value: < 2.2e-16
 
 Linear model for TPM with all features and MSR statistics:
 
@@ -242,20 +244,21 @@ Linear model for TPM with all features and MSR statistics:
     ##     Min      1Q  Median      3Q     Max 
     ## -9.8165 -0.7340  0.1249  0.9190  6.4561 
     ## 
-    ## Coefficients: (1 not defined because of singularities)
+    ## Coefficients: (2 not defined because of singularities)
     ##                           Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)              4.977e+01  1.039e+01   4.791 1.76e-06 ***
+    ## (Intercept)             -7.198e+00  2.195e+00  -3.279 0.001054 ** 
     ## nucleotides             -1.142e-06  2.042e-07  -5.593 2.46e-08 ***
     ## CpG_density              2.392e+01  1.225e+01   1.953 0.050958 .  
     ## `meth rate`             -1.867e+01  5.570e+00  -3.352 0.000814 ***
-    ## msr                     -1.608e+02  3.849e+01  -4.178 3.04e-05 ***
+    ## gene_count               1.359e-01  7.711e-03  17.620  < 2e-16 ***
+    ## genes_nucleotides_count  8.629e-07  1.493e-07   5.780 8.38e-09 ***
+    ## msr_density              2.828e+01  5.095e+00   5.551 3.13e-08 ***
+    ## msr                      4.366e+01  7.379e+00   5.916 3.74e-09 ***
     ## inverted_msr            -2.561e+01  4.052e+00  -6.321 3.06e-10 ***
     ## ecdf                    -1.601e+00  2.523e-01  -6.345 2.62e-10 ***
     ## `inverted ecdf`         -4.174e-02  1.972e-01  -0.212 0.832403    
-    ## residual                 2.045e+02  3.683e+01   5.551 3.13e-08 ***
+    ## residual                        NA         NA      NA       NA    
     ## inverted_residual               NA         NA      NA       NA    
-    ## gene_count               1.359e-01  7.711e-03  17.620  < 2e-16 ***
-    ## genes_nucleotides_count  8.629e-07  1.493e-07   5.780 8.38e-09 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
@@ -271,13 +274,13 @@ Linear model for TPM with all features and MSR statistics, without information a
     ## 
     ## Call:
     ## lm(formula = log_tpm ~ ., data = model_data[, c(to_predict, basic_predictors, 
-    ##     msr_predictors)])
+    ##     msr_predictors, "msr_density")])
     ## 
     ## Residuals:
     ##      Min       1Q   Median       3Q      Max 
     ## -11.0676  -0.7554   0.1751   1.0708   6.4409 
     ## 
-    ## Coefficients: (1 not defined because of singularities)
+    ## Coefficients: (2 not defined because of singularities)
     ##                     Estimate Std. Error t value Pr(>|t|)    
     ## (Intercept)        2.413e+01  1.090e+01   2.215   0.0269 *  
     ## nucleotides       -1.251e-06  2.189e-07  -5.717 1.21e-08 ***
@@ -289,6 +292,7 @@ Linear model for TPM with all features and MSR statistics, without information a
     ## `inverted ecdf`   -2.070e-01  2.133e-01  -0.970   0.3319    
     ## residual           9.893e+01  3.847e+01   2.571   0.0102 *  
     ## inverted_residual         NA         NA      NA       NA    
+    ## msr_density               NA         NA      NA       NA    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 

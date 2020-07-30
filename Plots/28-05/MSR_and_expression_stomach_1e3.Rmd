@@ -47,7 +47,7 @@ msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
 ```{r, include=FALSE}
 setwd(dir = "../../../")
 rna <- read_rna_file("MethylationCode/MethylationData/rna-seq/ENCFF918KPC_stomach.tsv")
-data <- sum_strands(readRDS("MethylationCode/MethylationData/wgbs/stomach.Rda"))
+#data <- sum_strands(readRDS("MethylationCode/MethylationData/wgbs/stomach.Rda"))
 msr_fragments_table = stomach_fragments_table_discrete
 rna_fragment_tables = readRDS("Rexperiments/stomach_rna_fragment_tables.Rda")
 wsize = 1
@@ -115,7 +115,7 @@ log(TPM) is considered only for fragments with at least a gene.
 
 ###### Comparison with simple MSR statistics:
 ```{r, echo=FALSE}
-chart.Correlation(data_table[,c(essentials, essential_msr_predictors)])
+chart.Correlation(data_table[,c(essentials, essential_msr_predictors, "msr_density")])
 ```
 
 ######Comparison with other MSR statistics:
@@ -272,16 +272,17 @@ Linear model for TPM with standard predictors:
 ```{r, echo=FALSE}
 gene_presence = data_table$gene_count>0
 model_data = (data_table[gene_presence,])
-model_data = model_data[complete.cases(model_data),]
+model_data = model_data[complete.cases(model_data[,msr_predictors]),]
 
-model = lm(log_tpm ~ . , data = model_data[, c(essentials)])
+standard_predictors = c(essentials, "genes_nucleotides_count", "msr_density")
+model = lm(log_tpm ~ . , data = model_data[, standard_predictors])
 summary(model)
 
 ```
 
 Linear model for TPM with all features and MSR statistics:
 ```{r, echo=FALSE}
-model = lm(log_tpm ~ . , data = model_data[, c(essentials, msr_predictors, "genes_nucleotides_count")])
+model = lm(log_tpm ~ . , data = model_data[, c(standard_predictors, msr_predictors)])
 summary(model)
 ```
 

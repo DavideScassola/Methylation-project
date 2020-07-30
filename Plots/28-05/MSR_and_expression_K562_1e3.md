@@ -129,57 +129,60 @@ Linear model for TPM with standard predictors:
 
     ## 
     ## Call:
-    ## lm(formula = log_tpm ~ ., data = model_data[, c(essentials)])
+    ## lm(formula = log_tpm ~ ., data = model_data[, standard_predictors])
     ## 
     ## Residuals:
     ##      Min       1Q   Median       3Q      Max 
-    ## -11.7311  -1.0200   0.9115   2.1548   9.7322 
+    ## -12.7421  -1.8543   0.3118   2.0978  11.8434 
     ## 
     ## Coefficients:
-    ##               Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  8.101e+00  5.900e-01  13.731  < 2e-16 ***
-    ## gene_count   1.790e-01  5.558e-02   3.221  0.00129 ** 
-    ## nucleotides -2.982e-05  2.817e-06 -10.585  < 2e-16 ***
-    ## CpG_density -7.283e+01  1.196e+01  -6.089 1.24e-09 ***
-    ## `meth rate` -3.882e+00  5.305e-01  -7.317 3.02e-13 ***
+    ##                           Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)             -4.034e-01  3.275e-01  -1.232   0.2181    
+    ## gene_count               8.269e-01  3.334e-02  24.799  < 2e-16 ***
+    ## nucleotides             -2.786e-06  1.578e-06  -1.766   0.0775 .  
+    ## CpG_density             -5.129e+01  7.033e+00  -7.293 3.21e-13 ***
+    ## `meth rate`             -4.151e+00  2.944e-01 -14.098  < 2e-16 ***
+    ## genes_nucleotides_count  4.770e-06  1.077e-06   4.428 9.58e-06 ***
+    ## msr_density              9.063e+00  1.194e-01  75.931  < 2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 3.359 on 4144 degrees of freedom
-    ## Multiple R-squared:  0.06659,    Adjusted R-squared:  0.06569 
-    ## F-statistic: 73.91 on 4 and 4144 DF,  p-value: < 2.2e-16
+    ## Residual standard error: 3.188 on 11806 degrees of freedom
+    ## Multiple R-squared:  0.4051, Adjusted R-squared:  0.4048 
+    ## F-statistic:  1340 on 6 and 11806 DF,  p-value: < 2.2e-16
 
 Linear model for TPM with all features and MSR statistics:
 
     ## 
     ## Call:
-    ## lm(formula = log_tpm ~ ., data = model_data[, c(essentials, msr_predictors, 
-    ##     "genes_nucleotides_count")])
+    ## lm(formula = log_tpm ~ ., data = model_data[, c(standard_predictors, 
+    ##     msr_predictors)])
     ## 
     ## Residuals:
-    ##      Min       1Q   Median       3Q      Max 
-    ## -11.2368  -1.2055   0.1934   1.6194   9.1641 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -11.855  -1.887   0.291   2.055  11.617 
     ## 
-    ## Coefficients: (1 not defined because of singularities)
+    ## Coefficients: (2 not defined because of singularities)
     ##                           Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)              1.326e+01  1.283e+00  10.330  < 2e-16 ***
-    ## gene_count               2.224e-01  4.372e-02   5.087 3.79e-07 ***
-    ## nucleotides             -3.930e-06  2.392e-06  -1.643      0.1    
-    ## CpG_density             -5.584e+01  9.552e+00  -5.846 5.44e-09 ***
-    ## `meth rate`             -5.802e+00  4.300e-01 -13.494  < 2e-16 ***
-    ## msr                     -4.581e+01  4.026e+00 -11.377  < 2e-16 ***
-    ## inverted_msr             2.242e+01  1.843e+00  12.162  < 2e-16 ***
-    ## ecdf                    -1.182e+00  2.247e-01  -5.260 1.51e-07 ***
-    ## `inverted ecdf`         -1.311e+00  2.245e-01  -5.843 5.54e-09 ***
-    ## residual                 3.214e+01  5.385e+00   5.968 2.60e-09 ***
+    ## (Intercept)             -1.785e+00  4.460e-01  -4.002 6.31e-05 ***
+    ## gene_count               7.649e-01  3.271e-02  23.383  < 2e-16 ***
+    ## nucleotides             -4.679e-08  1.566e-06  -0.030    0.976    
+    ## CpG_density             -3.900e+01  6.968e+00  -5.597 2.23e-08 ***
+    ## `meth rate`             -2.630e+00  2.980e-01  -8.825  < 2e-16 ***
+    ## genes_nucleotides_count  5.291e-06  1.054e-06   5.018 5.29e-07 ***
+    ## msr_density              4.377e+00  3.298e-01  13.271  < 2e-16 ***
+    ## msr                     -6.565e+00  1.150e+00  -5.707 1.18e-08 ***
+    ## inverted_msr             2.275e+01  1.205e+00  18.883  < 2e-16 ***
+    ## ecdf                    -7.969e-01  1.446e-01  -5.512 3.63e-08 ***
+    ## `inverted ecdf`         -1.893e+00  1.424e-01 -13.299  < 2e-16 ***
+    ## residual                        NA         NA      NA       NA    
     ## inverted_residual               NA         NA      NA       NA    
-    ## genes_nucleotides_count  7.152e-06  1.522e-06   4.699 2.69e-06 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 2.616 on 4138 degrees of freedom
-    ## Multiple R-squared:  0.4347, Adjusted R-squared:  0.4334 
-    ## F-statistic: 318.3 on 10 and 4138 DF,  p-value: < 2.2e-16
+    ## Residual standard error: 3.115 on 11802 degrees of freedom
+    ## Multiple R-squared:  0.432,  Adjusted R-squared:  0.4315 
+    ## F-statistic: 897.5 on 10 and 11802 DF,  p-value: < 2.2e-16
 
 Linear model for TPM with some features:
 
@@ -189,19 +192,19 @@ Linear model for TPM with some features:
     ##     (meth_rate) + (model_data$gene_count), data = model_data)
     ## 
     ## Residuals:
-    ##      Min       1Q   Median       3Q      Max 
-    ## -12.7512  -1.3538   0.5991   2.0507   7.3944 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -13.604  -2.351   0.621   2.488  11.119 
     ## 
     ## Coefficients:
     ##                         Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)              1.47731    0.47553   3.107   0.0019 ** 
-    ## model_data$inverted_msr 25.48461    0.92761  27.473  < 2e-16 ***
-    ## model_data$CpG_density  -4.12496    6.71952  -0.614   0.5393    
-    ## meth_rate               -6.04404    0.49443 -12.224  < 2e-16 ***
-    ## model_data$gene_count    0.22722    0.05182   4.385 1.19e-05 ***
+    ## (Intercept)             -4.31986    0.29114 -14.838  < 2e-16 ***
+    ## model_data$inverted_msr 29.46298    0.51787  56.893  < 2e-16 ***
+    ## model_data$CpG_density  -3.84026    4.65028  -0.826    0.409    
+    ## meth_rate               -2.42098    0.32025  -7.560 4.34e-14 ***
+    ## model_data$gene_count    1.00531    0.03563  28.213  < 2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 3.131 on 4144 degrees of freedom
-    ## Multiple R-squared:  0.1891, Adjusted R-squared:  0.1883 
-    ## F-statistic: 241.5 on 4 and 4144 DF,  p-value: < 2.2e-16
+    ## Residual standard error: 3.515 on 11808 degrees of freedom
+    ## Multiple R-squared:  0.2766, Adjusted R-squared:  0.2764 
+    ## F-statistic:  1129 on 4 and 11808 DF,  p-value: < 2.2e-16
