@@ -99,15 +99,15 @@ The fraction of fragments that have at least one gene inside is
 
     ## [1] 0.4420778
 
-Logistic Regression Model for gene presence with basic predictors (nucleotides, CpG\_density, meth rate):
+Logistic Regression Model for gene presence with basic predictors (nucleotides, CpG\_density, meth rate, msr\_density):
 
     ##        prediction
     ## actual      FALSE      TRUE
-    ##   FALSE 0.4234324 0.1344443
-    ##   TRUE  0.2065624 0.2355609
+    ##   FALSE 0.4250413 0.1222972
+    ##   TRUE  0.1618059 0.2908555
 
     ## 
-    ## accuracy:  0.6589933
+    ## accuracy:  0.7158968
 
 Logistic Regression Model with inverted\_msr as predictor
 
@@ -119,11 +119,19 @@ Logistic Regression Model with inverted\_msr as predictor
     ## 
     ## accuracy:  0.7417211
 
-Adding other predictors doesn't significantly improve the accuracy.
+Logistic Regression Model with all predictors
+
+    ##        prediction
+    ## actual      FALSE      TRUE
+    ##   FALSE 0.4303929 0.1169456
+    ##   TRUE  0.1299835 0.3226780
+
+    ## 
+    ## accuracy:  0.7530709
 
 #### Predicting log(TPM)
 
-Distribution of TPM values (only for regions that contains some genes) ![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-18-1.png)
+Distribution of TPM values (only for regions that contains some genes) ![](MSR_and_expression_stomach_1e3_files/figure-markdown_github/unnamed-chunk-19-1.png)
 
 Linear model for TPM with standard predictors:
 
@@ -188,23 +196,26 @@ Linear model for TPM with some features:
 
     ## 
     ## Call:
-    ## lm(formula = log_tpm ~ (model_data$inverted_msr) + (model_data$CpG_density) + 
-    ##     (meth_rate) + (model_data$gene_count), data = model_data)
+    ## lm(formula = log_tpm ~ ., data = model_data[, c(standard_predictors, 
+    ##     "inverted_msr")])
     ## 
     ## Residuals:
-    ##      Min       1Q   Median       3Q      Max 
-    ## -11.8354  -1.6980   0.5568   1.9555   8.9815 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -9.3858 -1.6848  0.4782  1.8897  8.9693 
     ## 
     ## Coefficients:
-    ##                          Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)              -3.70634    0.21847  -16.96   <2e-16 ***
-    ## model_data$inverted_msr -25.31141    0.58969  -42.92   <2e-16 ***
-    ## model_data$CpG_density   65.19791    3.41323   19.10   <2e-16 ***
-    ## meth_rate                 8.05754    0.28722   28.05   <2e-16 ***
-    ## model_data$gene_count     0.57886    0.02573   22.50   <2e-16 ***
+    ##                           Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)             -2.188e+00  2.701e-01  -8.100 5.98e-16 ***
+    ## gene_count               4.815e-01  2.580e-02  18.661  < 2e-16 ***
+    ## nucleotides             -1.335e-05  1.219e-06 -10.953  < 2e-16 ***
+    ## CpG_density              1.707e+01  5.756e+00   2.966  0.00302 ** 
+    ## `meth rate`              2.645e+01  1.835e+00  14.415  < 2e-16 ***
+    ## genes_nucleotides_count  1.355e-05  8.182e-07  16.560  < 2e-16 ***
+    ## msr_density             -1.863e+01  1.714e+00 -10.870  < 2e-16 ***
+    ## inverted_msr            -1.904e+01  6.659e-01 -28.592  < 2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 2.681 on 12598 degrees of freedom
-    ## Multiple R-squared:  0.1893, Adjusted R-squared:  0.189 
-    ## F-statistic: 735.3 on 4 and 12598 DF,  p-value: < 2.2e-16
+    ## Residual standard error: 2.626 on 12595 degrees of freedom
+    ## Multiple R-squared:  0.2223, Adjusted R-squared:  0.2219 
+    ## F-statistic: 514.3 on 7 and 12595 DF,  p-value: < 2.2e-16

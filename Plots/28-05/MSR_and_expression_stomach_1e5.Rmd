@@ -163,9 +163,10 @@ Negative binomial for gene number with basic predictors (nucleotides, CpG_densit
 library("MASS")
 
 # Logistics Regression
-model_data = (data_table[, c("nucleotides", "CpG_density", "meth rate", "gene_count")])
+model_data = data_table[complete.cases(data_table[,msr_predictors]),]
+model_data = (model_data[, c("nucleotides", "CpG_density", "meth rate", "gene_count", "msr_density")])
 model_data = model_data[complete.cases(model_data),]
-glm.fit <- glm.nb(model_data$gene_count ~ nucleotides+CpG_density+`meth rate`, data = model_data)
+glm.fit <- glm.nb(model_data$gene_count ~ nucleotides+CpG_density+`meth rate`+msr_density, data = model_data)
 
 
 summary(glm.fit)
@@ -180,8 +181,8 @@ actual = model_data$gene_count
 
 Negative binomial regression Model with inverted_msr as predictor
 ```{r, echo=FALSE}
-model_data = (data_table[, c("inverted_msr", "gene_count")])
-model_data = model_data[complete.cases(model_data),]
+model_data = data_table[complete.cases(data_table[,msr_predictors]),]
+model_data = (model_data[, c("inverted_msr", "gene_count")])
 glm.fit <- glm.nb(model_data$gene_count ~ model_data$inverted_msr , data = model_data)
 
 summary(glm.fit)
@@ -218,7 +219,8 @@ Linear model for log(TPM) with standard predictors:
 to_predict = "log_tpm"
 gene_presence = data_table$gene_count>0
 standard_predictors <- c(to_predict, basic_predictors, "gene_count", "genes_nucleotides_count", "msr_density")
-model_data = (data_table[gene_presence,standard_predictors])
+model_data = data_table[complete.cases(data_table[,msr_predictors]),]
+model_data = (model_data[gene_presence,standard_predictors])
 
 #model_data = model_data[complete.cases(model_data),]
 
@@ -242,6 +244,7 @@ legend("right", col = colors, legend = c("prediction error","centered log(tpm)")
 
 Linear model for TPM with all features and MSR statistics, without information about genes:
 ```{r, echo=FALSE}
+model_data = data_table[complete.cases(data_table[,msr_predictors]),]
 model = lm(log_tpm ~ . , model_data[, c(to_predict, basic_predictors, msr_predictors, "msr_density")])
 summary(model)
 ```
@@ -251,8 +254,8 @@ Linear model for TPM with some features:
 
 ```{r, echo=FALSE}
 
-meth_rate = model_data$`meth rate`
-model = lm(log_tpm ~ (model_data$inverted_msr) + (model_data$CpG_density) + (meth_rate) + (model_data$gene_count) + (model_data$msr), data = model_data)
+model_data = data_table[complete.cases(data_table[,msr_predictors]),]
+model = lm(log_tpm ~ ., data = model_data[,c(standard_predictors, "inverted_msr")])
 summary(model)
 ```
 

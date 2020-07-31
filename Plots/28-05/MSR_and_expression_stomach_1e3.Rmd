@@ -216,14 +216,15 @@ The fraction of fragments that have at least one gene inside is
 mean(data_table$gene_count>0, na.rm=T)
 ```
 
-Logistic Regression Model for gene presence with basic predictors (nucleotides, CpG_density, meth rate):
+Logistic Regression Model for gene presence with basic predictors (nucleotides, CpG_density, meth rate, msr_density):
 
 ```{r, echo=FALSE}
 
 # Logistics Regression
-model_data = (data_table[, c("nucleotides", "CpG_density", "meth rate", "gene_count")])
+model_data = data_table[complete.cases(data_table[,msr_predictors]),]
+model_data = (model_data[, c("nucleotides", "CpG_density", "meth rate", "gene_count", "msr_density")])
 model_data = model_data[complete.cases(model_data),]
-glm.fit <- glm(model_data$gene_count>0 ~ nucleotides+CpG_density+`meth rate`, data = model_data, family = binomial)
+glm.fit <- glm(model_data$gene_count>0 ~ nucleotides+CpG_density+`meth rate`+ msr_density , data = model_data, family = binomial)
 
 
 #summary(glm.fit)
@@ -240,7 +241,9 @@ cat("\naccuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
 
 Logistic Regression Model with inverted_msr as predictor
 ```{r, echo=FALSE}
-model_data = (data_table[, c("inverted_msr", "gene_count")])
+model_data = data_table[complete.cases(data_table[,msr_predictors]),]
+model_data = (model_data[, c("inverted_msr", "gene_count")])
+
 model_data = model_data[complete.cases(model_data),]
 glm.fit <- glm(model_data$gene_count>0 ~ model_data$inverted_msr , data = model_data, family = binomial)
 
@@ -255,7 +258,23 @@ cat("\naccuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
 ```
 
 
-Adding other predictors doesn't significantly improve the accuracy.
+Logistic Regression Model with all predictors
+```{r, echo=FALSE}
+model_data = (data_table[, c(basic_predictors, msr_predictors, "gene_count", "msr_density")])
+model_data = model_data[complete.cases(model_data),]
+glm.fit <- glm(model_data$gene_count>0 ~ . , data = model_data, family = binomial)
+
+probabilities = predict(glm.fit, type="response")
+prediction = probabilities>0.5
+actual = model_data$gene_count>0
+t = table(actual, prediction)
+prop.table(t)
+
+cat("\naccuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
+
+```
+
+
 
 
 #### Predicting log(TPM)
@@ -291,8 +310,10 @@ Linear model for TPM with some features:
 
 ```{r, echo=FALSE}
 
-meth_rate = model_data$`meth rate`
-model = lm(log_tpm ~ (model_data$inverted_msr) + (model_data$CpG_density) + (meth_rate) + (model_data$gene_count), data = model_data)
+#meth_rate = model_data$`meth rate`
+model_data = (data_table[gene_presence,])
+model_data = model_data[complete.cases(model_data[,msr_predictors]),]
+model = lm(log_tpm ~ ., data = model_data[, c(standard_predictors, "inverted_msr")])
 summary(model)
 ```
 
