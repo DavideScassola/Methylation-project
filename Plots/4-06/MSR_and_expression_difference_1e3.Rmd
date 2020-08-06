@@ -1,5 +1,5 @@
 ---
-title: "MSR and expression"
+title: "MSR and expression for H1, windows of 1000 sites"
 output: github_document
 ---
 
@@ -20,17 +20,10 @@ source("Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
 
 
 ##########################
-load("Rexperiments/stomach_fragments_table_stoc_V2.Rdata")
-load("Rexperiments/stomach_fragments_table_discrete_V2.Rdata")
-load("Rexperiments/stomach_fragments_table_adaptive_V2.Rdata")
 
-load("Rexperiments/H1_fragments_table_stoc_V2.Rdata")
 load("Rexperiments/H1_fragments_table_discrete_V2.Rdata")
-load("Rexperiments/H1_fragments_table_adaptive_V2.Rdata")
+load("Rexperiments/stomach_fragments_table_discrete_V2.Rdata")
 
-load("Rexperiments/K562_fragments_table_stoc_V2.Rdata")
-load("Rexperiments/K562_fragments_table_discrete_V2.Rdata")
-load("Rexperiments/K562_fragments_table_adaptive_V2.Rdata")
 
 genebody = readRDS("Rexperiments/genebody_improved.Rda")
 #########################
@@ -46,44 +39,34 @@ msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
 
 ```{r, include=FALSE}
 setwd(dir = "../../../")
-rna <- read_rna_file("MethylationCode/MethylationData/rna-seq/ENCFF918KPC_stomach.tsv")
-#data <- sum_strands(readRDS("MethylationCode/MethylationData/wgbs/stomach.Rda"))
-msr_fragments_table = stomach_fragments_table_discrete
-rna_fragment_tables = readRDS("Rexperiments/stomach_rna_fragment_tables.Rda")
+
+msr_fragments_table_H1 = fragments_table
+msr_fragments_table_stomach = stomach_fragments_table_discrete
+
+rna_fragment_tables_H1 = readRDS("Rexperiments/H1_rna_fragment_tables.Rda")
+rna_fragment_tables_stomach = readRDS("Rexperiments/stomach_rna_fragment_tables.Rda")
+
 wsize = 1
 #########################
 ```
 
-Here I will investigate if there is a relationship between the presence of genes and genes expression in a certain genomic region and the MSR (with some of its derivate statistics).
-
-I chose stomach cells data in order to do this, and CpG windows of size 1000, that corresponds to a variable window size in term of nucleotides (on average about 100,000).
-
-
-This is an example of total-rna-seq file, that shows for each "gene" its transcripts and some measures of expression. In this case I just kept two colums.
-The first one indicates the "gene"", the second one is the Transcript Per Million that is a relative measure of how much a gene is expressed.
-
-```{r, echo=FALSE}
-#stomach_rna
-rna[nchar(gene_id)>6]
-```
-
-This is the annotation file that store the position occupied by each human gene.
-
-```{r, echo=FALSE}
-genebody[,c(1,2,3,4,5,6)]
-```
-The number of genes is much less than the ones in the total-rna-seq file, since the first one also contains so called pseudogenes and other stuff.
-
-
 
 So the final dataFrame is the following (excluding some columns for readability):
 ```{r, echo=FALSE}
-data_table <- join_rna_and_msr_tables(rna_fragment_tables, msr_fragments_table, wsize)
+data_table_H1 <- join_rna_and_msr_tables(rna_fragment_tables_H1, msr_fragments_table_H1, wsize)
+data_table_stomach <- join_rna_and_msr_tables(rna_fragment_tables_stomach, msr_fragments_table_stomach, wsize)
+
+invariant_columns = c(1,2,3,4,5,6,9,20)
+
+data_table = data_table_stomach
+data_table[, -invariant_columns] = data_table[, -invariant_columns] - data_table_H1[, -invariant_columns]
 
 data_table <- exclude_outliers(data_table, lim = 2.5e5)
+
+
 data_table$log_tpm[data_table$gene_count==0] = NA
 #data_table <- exclude_outliers(data_table, lim = 2e6)
-head(data_table[complete.cases(data_table), c(1,2,3,5,7,11)])
+#head(data_table[complete.cases(data_table), c(1,2,3,5,7,11)])
 ```
 
 The full scheme includes:
@@ -272,7 +255,7 @@ Linear model for TPM with standard predictors:
 ```{r, echo=FALSE}
 gene_presence = data_table$gene_count>0
 model_data = (data_table[gene_presence,])
-#model_data = model_data[complete.cases(model_data),]
+model_data = model_data[complete.cases(model_data),]
 
 model = lm(log_tpm ~ . , data = model_data[, c(essentials)])
 summary(model)

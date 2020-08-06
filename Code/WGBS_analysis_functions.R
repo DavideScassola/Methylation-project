@@ -1,4 +1,5 @@
 source("MSR_analysis_functions.R", chdir = T)
+library("tools")
 
 filter_strand     <- function(data, sign) { return(data[strand==sign, -"strand"]) }
 pick_plus_strand  <- function(data)       { return(filter_strand(data,"+"))}
@@ -445,13 +446,18 @@ spatial_MSR_experiment_by_chromosome <- function(pos, window_size, fake_data, mi
   return(List(fragments_infos_array=fragments_infos_array, rr_list=rr_fragments_list, get_valid_rrs=get_valid_rrs))
 }
 
-total_spatial_experiment <- function(files, sizes, inversion, names, methylation_assigner, na_tolerance, fake_data, minimum_reads = 1)
+total_spatial_experiment <- function(files, sizes, inversion, names, methylation_assigner, na_tolerance, fake_data = F, minimum_reads = 1)
 {
   result = List()
   
   for(i in 1:length(files))
   {
-    data <- read_ENCODE_bed(files[i], verbose = T)
+    data <- NULL
+    if(file_ext(files[i])=="gz")
+      data <- read_ENCODE_bed(files[i], verbose = T)
+    else
+      data <- readRDS(files[i])
+    
     mrh <- function(x) keep_nas(x, minimum_reads)
     binary <- get_methylation_CpG_binary_vector(data,strands_handler = sum_strands, methylation_assigner = methylation_assigner, missing_read_handler = mrh)
     remove(data)
@@ -638,6 +644,7 @@ remove_version_from_gene <- Vectorize(function(s)
 
 read_rna_file <- function(file_rna, reduced = T, correct_gene_id = T)
 {
+  # name stomach is arbitrary here
   stomach_rna <- fread(file = file_rna,verbose=F, showProgress=T, stringsAsFactors = T)
   if(reduced)
     stomach_rna = stomach_rna[,c("gene_id", "TPM")]
@@ -672,6 +679,11 @@ get_genes_nucleotides_intersection <- function(start_chr, start_position, end_po
 get_TPM <- function(ids, rna_data)
 {
   rna_data[gene_id %in% (ids), TPM]
+}
+
+get_expected_count <- function(ids, rna_data)
+{
+  rna_data[gene_id %in% (ids), expected_count]
 }
 
 make_rna_window_data_frame <- function(wgbs_data, rna_data, genebody_annotation, window)
@@ -732,16 +744,17 @@ make_msr_rna_data_frame <- function(wgbs_data, rna_data, genebody_annotation, ms
     genes = get_genes_by_region(start_chr[i], start_positions[i], end_positions[i], genebody_annotation)
     genes_nucleotides_count <- get_genes_nucleotides_intersection(start_chr[i], start_positions[i], end_positions[i], genebody_annotation)
     tpm = get_TPM(genes, rna_data)
+    expected_count <- get_expected_count(genes, rna_data)
     total_TPM = sum(tpm)
-    
-    c(length(genes), sum(tpm), genes_nucleotides_count)
+    total_expected_count = sum(expected_count)
+    c(length(genes), total_TPM, genes_nucleotides_count, total_expected_count)
   })
   
   nucleotides = end_positions-start_positions
   nucleotides[nucleotides<=0] = NA
   
   out = cbind(data.frame(start_chr, start_positions, end_positions,
-                         nucleotides, gene_count = gene_info[1,], genes_nucleotides_count = gene_info[3,], total_TPM = gene_info[2,]
+                         nucleotides, gene_count = gene_info[1,], genes_nucleotides_count = gene_info[3,], total_TPM = gene_info[2,], total_expected_count = gene_info[3,]
   ), msr_experiment_data_frame)
   
   
@@ -755,6 +768,24 @@ join_rna_and_msr_tables <- function(rna_tables, msr_tables, i)
   
   df$log_tpm = log(df$total_TPM+ 1e-3)
   df$log_std_tpm = log(df$std_TPM)
+  
+  colnames(df)[l+1] <- "i_start"
+  colnames(df)[l+3] <- "meth rate"
+  colnames(df)[l+6] <- "ecdf"
+  colnames(df)[l+7] <- "inverted ecdf"
+  
+  df$CpG_density = (df$i_start[2]-df$i_start[1])/df$nucleotides
+  
+  df
+}
+
+join_rna_and_msr_table <- function(rna_table, msr_table)
+{
+  df = cbind(rna_table, msr_table)
+  l = length(colnames(rna_table))
+  
+  df$log_tpm = log(df$total_TPM+ 1e-3)
+  #df$log_std_tpm = log(df$std_TPM)
   
   colnames(df)[l+1] <- "i_start"
   colnames(df)[l+3] <- "meth rate"
@@ -841,6 +872,130 @@ difference_meth_plot <- function(d1, d2, name1, name2, min_reads, cgi_anno, isla
   
   
 }
+
+
+noNa <- function(d, verbose = T)
+{
+  nn <- d[complete.cases(d),]
+  if(verbose)
+    cat("NAs: ", length(d[,1])-length(nn[,1]), length(d[,1])/length(nn[,1]),"%\n")
+  return(nn)
+}
+
+
+suppressWarnings(library(infotheo))
+
+fast.mutual.information <- function(a, b, method = "mm", normalized = T)
+{
+  d <- data.frame(a,b)
+  d <- discretize(d)
+  
+  mi <-  mutinformation(d[,1],d[,2], method)
+  if(!normalized)
+    return(mi)
+  else
+    return(mi/sqrt(entropy(d[,1],method)*entropy(d[,2],method)))
+ 
+}
+
+
+suppressWarnings(library(corrplot))
+
+mi.plot <- function(data, method = "mm")
+{
+  names = colnames(data)
+  size = length(names)
+  M = array(dim = c(size,size),0)
+  
+  for(i in 1:size)
+  {
+    for(j in 1:i)
+    {
+      M[i,j] = fast.mutual.information(data[,i], data[,j], method)
+      M[j,i] = M[i,j]
+    }
+  }
+  
+  colnames(M) <- names
+  rownames(M) <- names
+  corrplot(M, "number")
+  return(M)
+}
+
+pairwise.plot <- function(data, binary_function)
+{
+  names = colnames(data)
+  size = length(names)
+  M = array(dim = c(size,size),0)
+  
+  for(i in 1:size)
+  {
+    for(j in 1:i)
+    {
+      M[i,j] = binary_function(data[,i], data[,j])
+      M[j,i] = M[i,j]
+    }
+  }
+  
+  colnames(M) <- names
+  rownames(M) <- names
+  corrplot(M, "number")
+  return(M)
+}
+
+discretized_density <- function(wgbs_data, indexes)
+{
+  discretized_prop <- wgbs_data$prop>=50
+  cs <- corrected_cumsum(discretized_prop)
+  b <- indexes[2:length(indexes)]
+  a <- indexes[1:(length(indexes)-1)]
+  (cs[b]-cs[a])/(b-a)
+  
+}
+
+discretized_density <- function(wgbs_data, indexes)
+{
+  discretized_prop <- wgbs_data$prop>=50
+  step <- indexes[2]-indexes[1]
+  
+  sapply(1:length(indexes), function(i)
+    {
+    mean(discretized_prop[(indexes[i]):(indexes[i]+step)], na.rm = T)
+  })
+}
+
+
+significance_measure <- function(msr, density, msr_ecdf, inverted)
+{
+  if(inverted)
+    density = 1-density
+  
+  l = length(density)
+  zero = function(x) {0}
+  
+  if(msr_ecdf[[1]]$prop==0) msr_ecdf[[1]]$cdf = zero
+  if(msr_ecdf[[length(msr_ecdf)]]$prop==1) msr_ecdf[[length(msr_ecdf)]]$cdf = zero
+  
+  sapply( 1:l ,function(n)
+  {
+    #cat(n, " ")
+    if(is.na(density[n]) || is.na(msr[n])) return(NA)
+    general_msr_cdf(msr_ecdf, density[n], msr[n])
+  })
+  
+}
+
+get_residuals <- function(msr, density, inverted)
+{
+  if(inverted)
+    density = 1-density
+  res = lm(msr~density)$residuals
+  mask = !is.na(density) & !is.na(msr)
+  out = array(dim = length(mask))
+  out[mask] = res
+  return(out)
+}
+
 
 
 

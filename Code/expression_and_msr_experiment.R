@@ -1,7 +1,7 @@
 setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
 
 #source("WGBS_analysis_functions.R", chdir = T)
-source("Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
+source("WGBS_analysis_functions.R", chdir = T)
 ##################################
 #stomach_fragments_rna_tables = lapply(c(1e3,1e4,1e5,1e6), function(window)
 #{
@@ -32,9 +32,12 @@ fancy_msr_predictors <- c("ecdf(msr, density)", "inverted ecdf(msr, density)", "
 msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
 #------------------------
 
+stomach_rna_fragment_tables = readRDS("../../Rexperiments/stomach_rna_fragment_tables.Rda")
 
-table <- join_rna_and_msr_tables(stomach_rna_fragment_tables, stomach_fragments_table_adaptive, 2)
+
+table <- join_rna_and_msr_tables(stomach_rna_fragment_tables, stomach_fragments_table_discrete, 2)
 table <- exclude_outliers(table, lim = 2e6)
+
 
 gene_mask =table$gene_count>0
 boxplot(table$msr[!gene_mask], table$msr[gene_mask])

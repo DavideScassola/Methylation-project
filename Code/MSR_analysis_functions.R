@@ -645,6 +645,8 @@ msr_confidence_line <- function(ecdfs, confidence = 0.99)
   })
 }
 
+
+
 add_msr_confidence_line <- function(ecdfs, confidence = 0.99, col = 1, lty = 2)
 {
   conf = msr_confidence_line(ecdfs, confidence)
@@ -664,6 +666,28 @@ general_msr_cdf <- function(ecdfs, density, msr)
     }
   }
 }
+
+extract_ecdf_function <- function(ecdfs, density)
+{
+  d = msr_confidence_line(msr_ecdf_1e3, density)
+  approxfun(x = d[1,], y = d[2,])
+}
+
+general_msr_cdf <- function(ecdfs, density, msr)
+{
+  
+  for( i in 1:length(ecdfs))
+  {
+    if(density>= ecdfs[[i]]$prop & density<= ecdfs[[i+1]]$prop)
+    {
+      dist1 = density - ecdfs[[i]]$prop
+      dist2 = ecdfs[[i+1]]$prop - density
+      w = dist1/(dist1+dist2)
+      return(ecdfs[[i]]$cdf(msr)*(1-w)+(w)*ecdfs[[i+1]]$cdf(msr))
+    }
+  }
+}
+
 
 
 #markovchain_fake_data <- function(size, transition_matrix)
