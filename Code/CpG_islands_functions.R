@@ -1,4 +1,4 @@
-#setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
+setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
 source("WGBS_analysis_functions.R", chdir = T)
 
 # HOW TO GENERATE CPG ISL DATA
@@ -141,17 +141,65 @@ add_wgbs_indexes <- function(Annotations_dataframe, wgbs_data, cores = 1)
   
 }
 
+add_wgbs_indexes2 <- function(Annotations_dataframe, wgbs_data, cores = 1)
+{
+  wgbs_data = sum_strands(wgbs_data)
+  data_scheme <- (wgbs_data)[, c("chr","Cpos")]
+  l = length(Annotations_dataframe$start)
+  
+  anno = Annotations_dataframe[Annotations_dataframe$chr %in% levels(data_scheme$chr[1])]
+  anno$chr = factor(anno$chr)
+  
+  wgbs_chr = (data_scheme$chr)
+  anno_chr = anno$chr
+  anno_start = anno$start
+  anno_end = anno$end
+  
+  anno$i_start <- anno$start
+  anno$i_start <- NA
+  anno$i_end <-anno$end
+  anno$i_end <-anno$end <- NA
+  
+  s = 1
+  inside_gene <- F
+  for(i in 1:length(wgbs_data$Cpos))
+  {
+    if(!inside_gene & (wgbs_data$Cpos[i]>=anno[s]$start) & (as.character(anno[s]$chr)==wgbs_data[i]$chr))
+    {
+      anno$i_start[s] <- i
+      inside_gene <- T
+    }
+    anno$i_end[s] <- i
+    if(inside_gene & (wgbs_data$Cpos[i]<=anno[s]$end) & (as.character(anno[s]$chr)==wgbs_data[i]$chr) | (as.character(anno[s]$chr)!=wgbs_data[i]$chr))
+    {
+      inside_gene <- F
+      s <- s + 1
+    }
+  }
+
+  gc()
+  return(anno)
+  
+}
+
 #########################################
 
 
 from_bed_to_annotation_with_wgbs_indexes <- function(bed_file, wgbs_data_file, cores = 1)
 {
-  wgbs_data = read_ENCODE_bed(wgbs_data_file)
+  wgbs_data <- NULL
+  if(file_ext(wgbs_data_file)=="gz")
+    wgbs_data <- read_ENCODE_bed(wgbs_data_file)
+  else
+    wgbs_data <- readRDS(wgbs_data_file)
+
   anno <- fread(file = bed_file,verbose=F, showProgress=T, stringsAsFactors = T)
   anno$chr <- to_chr_factor(anno$chr)
-  
+
   anno_improved = add_wgbs_indexes(anno, wgbs_data, cores)
   new_name = paste(substring(bed_file, 1, nchar(bed_file)-4), "_improved.Rda", sep = "")
   saveRDS(anno_improved, file = new_name)
 }
 
+# per i topi
+#anno <- fread(file = bed_file,verbose=F, showProgress=T, stringsAsFactors = T,select = c(1,2,3,6,4,7), col.names = c("chr", "start", "end", "strand", "id", "anno"))

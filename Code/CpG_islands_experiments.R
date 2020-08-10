@@ -1,4 +1,3 @@
-
 setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
 load("../../MethylationCode/MethylationData/CpGislands.Rdata")
 load("../../MethylationCode/MethylationData/Enhancers.Rdata")

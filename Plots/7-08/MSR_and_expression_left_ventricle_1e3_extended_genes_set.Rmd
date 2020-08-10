@@ -1,5 +1,5 @@
 ---
-title: "MSR and expression for ovary, windows of 1000 sites"
+title: "MSR and expression for heart left ventricle, windows of 1000 sites, extended genes set"
 output: github_document
 ---
 
@@ -34,40 +34,24 @@ msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
 
 ```{r, include=FALSE}
 setwd(dir = "../../../")
-rna <- read_rna_file("MethylationCode/MethylationData/rna-seq/ENCFF061BJL_ovary_53_gene_quantifications.tsv")
-msr_fragments_table = readRDS("Rexperiments/ENCFF303ZGP_ovary_msr_table_1000.Rda")
-rna_fragment_table = readRDS("Rexperiments/ENCFF061BJL_ovary_rna_table_1000.Rda")
+rna <- read_rna_file("MethylationCode/MethylationData/rna-seq/ENCFF860DPP_left_ventricle_male_34.tsv")
+msr_fragments_table = readRDS("Rexperiments/ENCFF536RSX_left_ventricle_msr_table_1000.Rda")
+#rna_fragment_table = readRDS("Rexperiments/ENCFF536RSX_left_ventricle_rna_table_1000.Rda")
+rna_fragment_table = readRDS("Rexperiments/ENCFF536RSX_left_ventricle_rna_table_1000_extended.Rda")
+
 #########################
 ```
 
-Here I will investigate if there is a relationship between the presence of genes and genes expression in a certain genomic region and the MSR (with some of its derivate statistics).
-
-I chose ovary cells data in order to do this, and CpG windows of size 1000, that corresponds to a variable window size in term of nucleotides (on average about 100,000).
 
 
-This is an example of total-rna-seq file, that shows for each "gene" its transcripts and some measures of expression. In this case I just kept two colums.
-The first one indicates the "gene"", the second one is the Transcript Per Million that is a relative measure of how much a gene is expressed.
-
-```{r, echo=FALSE}
-#ovary_rna
-rna[nchar(gene_id)>6]
-```
-
-This is the annotation file that store the position occupied by each human gene.
-
-```{r, echo=FALSE}
-genebody[,c(1,2,3,4,5,6)]
-```
-The number of genes is much less than the ones in the total-rna-seq file, since the first one also contains so called pseudogenes and other stuff.
-
-
-
-So the final dataFrame is the following (excluding some columns for readability):
+The DataFrame is the following (excluding some columns for readability):
 ```{r, echo=FALSE}
 data_table <- join_rna_and_msr_table(rna_fragment_table, msr_fragments_table)
+tpm_noise <- rexp(length(data_table$log_tpm), rate = 1e3)
+data_table$log_tpm <- log(data_table$total_TPM + tpm_noise)
 
 data_table <- exclude_outliers(data_table, lim = 2.5e5)
-data_table$log_tpm[data_table$gene_count==0] = NA
+#data_table$log_tpm[data_table$gene_count==0] = NA
 #data_table <- exclude_outliers(data_table, lim = 2e6)
 head(data_table[complete.cases(data_table), c(1,2,3,5,7,11)])
 ```
@@ -88,11 +72,9 @@ then the MSR and some related statistics:
 **msr**, **inverted msr**, **msr ecdf **, **inverted msr ecdf**, **residual** (residual of the linear regression between msr and meth rate), **inverted residual**.
 
 
-```{r, echo=FALSE}
-
-```
-
 First let's see if there are pairwise correlations between the features.
+
+TPM for regions with 0 genes is considered 0.
 
 ###### Basic features:
 
@@ -100,7 +82,6 @@ First let's see if there are pairwise correlations between the features.
 chart.Correlation(data_table[,essentials])
 ```
 
-log(TPM) is considered only for fragments with at least a gene.
 
 ###### Comparison with simple MSR statistics:
 ```{r, echo=FALSE}
@@ -112,91 +93,47 @@ chart.Correlation(data_table[,c(essentials, essential_msr_predictors)])
 chart.Correlation(data_table[,c(y, fancy_msr_predictors)])
 ```
 
+```{r, echo=FALSE, warning=FALSE}
+#mi.plot(data_table[,c(essentials, essential_msr_predictors)])
+```
+
 inverted msr vs log(tpm):
-```{r echo=FALSE, warning=FALSE}
+```{r, echo=FALSE, warning=FALSE}
 library(ggplot2)
 library(ggExtra)
 #plot(data_table$inverted_msr, data_table$log_tpm, pch = )
 #ggplot(data_table,aes(x=inverted_msr,y=log_tpm)) + stat_binhex(bins = 20) + scale_fill_viridis_c() + geom_point(shape = '.', col = 'white')
-((ggplot(data_table,aes(x=inverted_msr,y=log_tpm)) + geom_point(alpha = 0.03)))
+
+((ggplot(data_table,aes(x=inverted_msr,y=log_tpm)) + geom_point(alpha = 0.03))) + ylab("log (TPM)")
 ```
 
 
-#### Predicting gene presence
-Check if features can predict gene presence:
+```{r, echo=FALSE, warning=FALSE}
+((ggplot(data_table,aes(x=residual,y=log_tpm)) + geom_point(alpha = 0.03)))+ ylab("log (TPM)")
+```
 
-```{r, echo=FALSE}
-gene_mask = data_table$gene_count>0
-feature = feature = data_table$`meth rate`
-feature_name = "methylation rate"
-
-binary_predictivity_hist(feature,
-                         mask = gene_mask,
-                         xlab = feature_name, sep_names = c("one or more genes", "no genes"),
-                         colors = c(5,7), breaks = 15,
-                         main = sprintf("Can %s predict the presence of a gene?", feature_name),
-                         max_y = 8)
-
+```{r, echo=FALSE, warning=FALSE}
+((ggplot(data_table,aes(x=msr_density,y=log_tpm)) + geom_point(alpha = 0.03)))+ ylab("log (TPM)")
 ```
 
 ```{r, echo=FALSE}
+threshold = 0
 
-feature = feature = 1000/data_table$nucleotides
-feature_name = "CpG density"
+cols = c(alpha(2,0.5), alpha(3,0.5))
+hist(data_table[data_table$total_TPM<=threshold,]$inverted_msr, breaks = 40, col = cols[1], probability = F, xlab = "inverted msr", main = "Distribution comparison")
+hist(data_table[data_table$total_TPM>threshold,]$inverted_msr, breaks = 40, col = cols[2], add = T, probability = F)
 
-binary_predictivity_hist(feature,
-                         mask = gene_mask,
-                         xlab = feature_name, sep_names = c("one or more genes", "no genes"),
-                         colors = c(5,7), breaks = 15,
-                         main = sprintf("Can %s predict the presence of a gene?", feature_name),
-                         max_y = 70)
-
+legend("top", legend=c(paste("TPM <=",threshold), c(paste("TPM >",threshold))), col=cols, fill = cols)
 ```
 
 ```{r, echo=FALSE}
+threshold = 0
 
-feature = data_table$inverted_msr
-feature_name = "inverted MSR"
+cols = c(alpha(2,0.5), alpha(3,0.5))
+hist(data_table[data_table$total_TPM<=threshold,]$msr_density, breaks = 40, col = cols[1], probability = F, xlab = "discretized meth rate", main = "Distribution comparison")
+hist(data_table[data_table$total_TPM>threshold,]$msr_density, breaks = 40, col = cols[2], add = T, probability = F)
 
-binary_predictivity_hist(feature,
-                         mask = gene_mask,
-                         xlab = "inverted MSR", sep_names = c("one or more genes", "no genes"),
-                         colors = c(5,7), breaks = 15,
-                         main = sprintf("Can %s predict the presence of a gene?", feature_name),
-                         max_y = 30)
-
-#feature = data_table$inverted_msr
-#feature = data_table$`ecdf(msr, density)`
-#feature = data_table$`inverted ecdf(msr, density)`
-```
-
-```{r, echo=FALSE}
-
-feature = feature = data_table$`inverted ecdf`
-feature_name = "inverted ecdf"
-
-binary_predictivity_hist(feature,
-                         mask = gene_mask,
-                         xlab = feature_name, sep_names = c("one or more genes", "no genes"),
-                         colors = c(5,7), breaks = 15,
-                         main = sprintf("Can %s predict the presence of a gene?", feature_name),
-                         max_y = 13)
-
-```
-
-
-
-
-```{r, echo=FALSE}
-
-gene_0 = data_table$gene_count==0
-gene_1 = data_table$gene_count==1
-gene_2 = data_table$gene_count==2
-gene_many = data_table$gene_count>2
-
-boxplot(data_table$inverted_msr[gene_0], data_table$inverted_msr[gene_1], data_table$inverted_msr[gene_2], data_table$inverted_msr[gene_many], names = c("No genes", "one gene", "two genes", "more than 2 genes"), ylab = "inverted MSR")
-title("Inverted MSR and number of genes")
-
+legend("top", legend=c(paste("TPM <=",threshold), c(paste("TPM >",threshold))), col=cols, fill = cols)
 ```
 
 ```{r, echo=FALSE}
@@ -223,17 +160,17 @@ train_model_data = model_data[train_rows,]
 test_model_data = model_data[test_rows,]
 ```
 
-The fraction of fragments that have at least one gene inside is (train data)
+The fraction of fragments that have at least TPM (train data)
 ```{r, echo=FALSE}
-mean(train_model_data$gene_count>0, na.rm=T)
+mean(train_model_data$total_TPM>threshold, na.rm=T)
 ```
 
-Logistic Regression Model for gene presence with basic predictors (nucleotides, CpG_density, meth rate, msr_density):
+Logistic Regression Model for TPM presence with basic predictors (nucleotides, CpG_density, meth rate, msr_density):
 
 ```{r, echo=FALSE}
 
 # Logistics Regression
-glm.fit <- glm(train_model_data$gene_count>0 ~ nucleotides+CpG_density+`meth rate`+ msr_density , data = train_model_data, family = binomial)
+glm.fit <- glm(train_model_data$total_TPM>threshold ~ nucleotides+CpG_density+`meth rate`+ msr_density , data = train_model_data, family = binomial)
 
 
 #summary(glm.fit)
@@ -241,7 +178,7 @@ cat("TRAIN DATA ")
 nd <- train_model_data
 probabilities = predict(glm.fit, newdata = nd, type="response")
 prediction = probabilities>0.5
-actual = nd$gene_count>0
+actual = nd$total_TPM>threshold
 t = table(actual, prediction)
 #prop.table(t)
 
@@ -251,7 +188,7 @@ cat("TEST DATA ")
 nd <- test_model_data
 probabilities = predict(glm.fit, newdata = nd, type="response")
 prediction = probabilities>0.5
-actual = nd$gene_count>0
+actual = nd$total_TPM>threshold
 t = table(actual, prediction)
 #prop.table(t)
 
@@ -261,14 +198,14 @@ cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
 
 Logistic Regression Model with inverted_msr as predictor
 ```{r, echo=FALSE}
-glm.fit <- glm(train_model_data$gene_count>0 ~ inverted_msr , data = train_model_data, family = binomial)
+glm.fit <- glm(train_model_data$total_TPM>threshold ~ inverted_msr , data = train_model_data, family = binomial)
 
 #summary(glm.fit)
 cat("TRAIN DATA")
 nd <- train_model_data
 probabilities = predict(glm.fit, newdata = nd, type="response")
 prediction = probabilities>0.5
-actual = nd$gene_count>0
+actual = nd$total_TPM>threshold
 t = table(actual, prediction)
 #prop.table(t)
 
@@ -278,7 +215,7 @@ cat("TEST DATA")
 nd <- test_model_data
 probabilities = predict(glm.fit, newdata = nd, type="response")
 prediction = probabilities>0.5
-actual = nd$gene_count>0
+actual = nd$total_TPM>threshold
 t = table(actual, prediction)
 #prop.table(t)
 
@@ -289,14 +226,14 @@ cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
 
 Logistic Regression Model with all predictors
 ```{r, echo=FALSE}
-glm.fit <- glm(train_model_data$gene_count>0 ~ . , data = train_model_data[, c(basic_predictors, msr_predictors, "gene_count")], family = binomial)
+glm.fit <- glm(train_model_data$total_TPM>threshold ~ . , data = train_model_data[, c(basic_predictors, msr_predictors)], family = binomial)
 
 #summary(glm.fit)
 cat("TRAIN DATA")
 nd <- train_model_data
 probabilities = predict(glm.fit, newdata = nd, type="response")
 prediction = probabilities>0.5
-actual = nd$gene_count>0
+actual = nd$total_TPM>threshold
 t = table(actual, prediction)
 #prop.table(t)
 
@@ -306,7 +243,7 @@ cat("TEST DATA")
 nd <- test_model_data
 probabilities = predict(glm.fit, newdata = nd, type="response")
 prediction = probabilities>0.5
-actual = nd$gene_count>0
+actual = nd$total_TPM>threshold
 t = table(actual, prediction)
 #prop.table(t)
 
@@ -316,9 +253,7 @@ cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
 
 
 
-
 #### Predicting log(TPM)
-
 Distribution of TPM values (only for regions that contains some genes)
 ```{r, echo=FALSE}
 hist(log(model_data[model_data$gene_count>0, ]$total_TPM+1e-3, base = 10), xlab = "log(TPM + 1e-3)", main = "", breaks = 50)
@@ -326,10 +261,8 @@ hist(log(model_data[model_data$gene_count>0, ]$total_TPM+1e-3, base = 10), xlab 
 
 
 
-Linear model for TPM with standard predictors:
+Linear model for TPM with standard predictors, available information about genes:
 ```{r, echo=FALSE}
-train_model_data = train_model_data[train_model_data$gene_count>0, ]
-test_model_data = test_model_data[test_model_data$gene_count>0, ]
 
 standard_predictors = c(essentials, "genes_nucleotides_count")
 model = lm(log_tpm ~ . , data = train_model_data[, standard_predictors])
@@ -338,7 +271,7 @@ summary(model)
 cat("Test data R squared: ", 1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )
 ```
 
-Linear model for TPM with all features and MSR statistics:
+Linear model for TPM with all features and MSR statistics, available information about genes:
 ```{r, echo=FALSE}
 model = lm(log_tpm ~ . , data = train_model_data[, c(standard_predictors, msr_predictors)])
 summary(model)
@@ -347,7 +280,7 @@ cat("Test data R squared: ", 1-(var(predict(model, test_model_data, type="respon
 ```
 
 
-Linear model for TPM with some features:
+Linear model for TPM with adding inverted msr, available information about genes:
 
 ```{r, echo=FALSE}
 model = lm(log_tpm ~ ., data = train_model_data[, c(standard_predictors, "inverted_msr")])
@@ -359,11 +292,6 @@ cat("Test data R squared: ", 1-(var(predict(model, test_model_data, type="respon
 
 Linear model for TPM with basic features but no information about genes:
 ```{r, echo=FALSE}
-train_model_data = model_data[train_rows,]
-test_model_data = model_data[test_rows,]
-train_model_data$log_tpm <- log(train_model_data$total_TPM+1e-3)
-test_model_data$log_tpm <- log(test_model_data$total_TPM+1e-3)
-
 model = lm(log_tpm ~ ., data = train_model_data[, c("log_tpm", basic_predictors)])
 summary(model)
 
@@ -379,9 +307,9 @@ summary(model)
 cat("Test data R squared: ", 1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )
 ```
 
-Linear model for TPM with residual but no information about genes:
+Linear model for TPM with inverted msr but no information about genes:
 ```{r, echo=FALSE}
-model = lm(log_tpm ~ ., data = train_model_data[, c("log_tpm", basic_predictors, "residual")])
+model = lm(log_tpm ~ ., data = train_model_data[, c("log_tpm", basic_predictors, "inverted_msr")])
 summary(model)
 
 cat("Test data R squared: ", 1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )

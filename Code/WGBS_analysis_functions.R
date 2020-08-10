@@ -664,6 +664,13 @@ get_genes_by_region <- function(start_chr, start_position, end_position, genebod
   
   # start included
   genebody_annotation[chr==start_chr & start>=start_position & start<=end_position]$id
+  #indexes <- which(genebody_annotation$chr==start_chr & genebody_annotation$start>=start_position & genebody_annotation$start<=end_position)
+}
+
+get_genes_indexes_by_region <- function(start_chr, start_position, end_position, genebody_annotation)
+{
+  # start included
+  which(genebody_annotation$chr==start_chr & genebody_annotation$start>=start_position & genebody_annotation$start<=end_position)
 }
 
 get_genes_nucleotides_intersection <- function(start_chr, start_position, end_position, genebody_annotation)
@@ -688,7 +695,7 @@ get_expected_count <- function(ids, rna_data)
 
 make_rna_window_data_frame <- function(wgbs_data, rna_data, genebody_annotation, window)
 {
-  wgbs_data = sum_strands(wgbs_data, verbose = F)
+  wgbs_data = sum_strands(wgbs_data, verbose = F); gc()
   
   l = length(wgbs_data$prop)
   fragments <- floor(l/window)
@@ -703,14 +710,20 @@ make_rna_window_data_frame <- function(wgbs_data, rna_data, genebody_annotation,
   
   rna_data = rna_data[gene_id %in% genebody_annotation$id]
   
+  colnames(genebody_annotation)[5] = "gene_id"
+  merged = merge(x = genebody_annotation, y = rna, by = "gene_id", all = TRUE)
+  merged$TPM[is.na(merged$TPM)] <- 0
+  
+  gc()
   gene_info = sapply(1:l, function(i)
   {
     if((i %% floor(l/100)) == 0)
       cat(floor(100*i/l), "%  ")
     
-    genes = get_genes_by_region(start_chr[i], start_position[i], end_position[i], genebody_annotation)
+    genes_indexes = get_genes_indexes_by_region(start_chr[i], start_position[i], end_position[i], merged)
+    genes = merged[genes_indexes, gene_id]
     genes_nucleotides_count <- get_genes_nucleotides_intersection(start_chr[i], start_position[i], end_position[i], genebody_annotation)
-    tpm = get_TPM(genes, rna_data)
+    tpm = merged[genes_indexes, TPM] #get_TPM(genes, rna_data)
     total_TPM = sum(tpm)
     std_TPM = sd(tpm)
 
