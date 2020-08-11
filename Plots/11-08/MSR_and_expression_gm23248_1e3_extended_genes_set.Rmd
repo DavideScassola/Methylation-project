@@ -1,0 +1,316 @@
+---
+title: "MSR and expression for gm23248, windows of 1000 sites, extended genes set"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(fig.width=20, fig.height=12) 
+
+#setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
+#source("Methylation-project/Code/expression_and_msr_experiment.R", chdir = T)
+```
+
+
+
+```{r, include=FALSE}
+library("PerformanceAnalytics")
+setwd(dir = "../../../")
+source("Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
+
+
+##########################
+genebody = readRDS("Rexperiments/genebody_improved.Rda")
+##########################
+
+y <- c("gene_count", "log_tpm")
+basic_predictors <- c("nucleotides", "CpG_density", "meth rate", "msr_density")
+essentials <- c(y, basic_predictors)
+essential_msr_predictors <- c("msr", "inverted_msr")
+fancy_msr_predictors <- c("ecdf", "inverted ecdf", "residual", "inverted_residual")
+msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
+```
+
+
+```{r, include=FALSE}
+msr_fragments_table = readRDS("../../../Rexperiments/ENCFF752NXS_GM23248_msr_table_1000.Rda")
+rna_fragment_table = readRDS("../../../Rexperiments/ENCFF752NXS_GM23248_rna_table_1000_extended.Rda")
+
+#########################
+```
+
+
+
+The DataFrame is the following (excluding some columns for readability):
+```{r, echo=FALSE}
+data_table <- join_rna_and_msr_table(rna_fragment_table, msr_fragments_table)
+#tpm_noise <- rexp(length(data_table$log_tpm), rate = 1e3)
+log_tpm_noise <- rnorm(length(data_table$log_tpm), sd = 0.5)
+log_tpm_noise[data_table$total_TPM>0] <- 0
+
+data_table$log_tpm <- data_table$log_tpm + log_tpm_noise
+
+data_table <- exclude_outliers(data_table, lim = 2.5e5)
+#data_table$log_tpm[data_table$gene_count==0] = NA
+#data_table <- exclude_outliers(data_table, lim = 2e6)
+head(data_table[complete.cases(data_table), c(1,2,3,5,7,11)])
+```
+
+The full scheme includes:
+
+**nucleotides**: number of nucleotides in the window
+
+**CpG density**: fraction of nucleotides that is a C of a CpG site (= 1000/nucleotides)
+
+**meth rate**: ratio of methylated CpG sites
+
+**gene_count**: number of genes included (even partially) inside the interval
+
+**total_TPM**: sum of the TPMs of the genes in the interval
+
+then the MSR and some related statistics: 
+**msr**, **inverted msr**, **msr ecdf **, **inverted msr ecdf**, **residual** (residual of the linear regression between msr and meth rate), **inverted residual**.
+
+
+First let's see if there are pairwise correlations between the features.
+
+TPM for regions with 0 genes is considered 0.
+
+###### Basic features:
+
+```{r, echo=FALSE}
+chart.Correlation(data_table[,essentials])
+```
+
+
+###### Comparison with simple MSR statistics:
+```{r, echo=FALSE}
+chart.Correlation(data_table[,c(essentials, essential_msr_predictors)])
+```
+
+######Comparison with other MSR statistics:
+```{r, echo=FALSE}
+chart.Correlation(data_table[,c(y, fancy_msr_predictors)])
+```
+
+```{r, echo=FALSE, warning=FALSE}
+#mi.plot(data_table[,c(essentials, essential_msr_predictors)])
+```
+
+inverted msr vs log(tpm):
+```{r, echo=FALSE, warning=FALSE}
+library(ggplot2)
+library(ggExtra)
+#plot(data_table$inverted_msr, data_table$log_tpm, pch = )
+#ggplot(data_table,aes(x=inverted_msr,y=log_tpm)) + stat_binhex(bins = 20) + scale_fill_viridis_c() + geom_point(shape = '.', col = 'white')
+
+((ggplot(data_table,aes(x=inverted_msr,y=log_tpm)) + geom_point(alpha = 0.03))) + ylab("log (TPM)")
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+((ggplot(data_table,aes(x=residual,y=log_tpm)) + geom_point(alpha = 0.03)))+ ylab("log (TPM)")
+```
+
+```{r, echo=FALSE, warning=FALSE}
+((ggplot(data_table,aes(x=msr_density,y=log_tpm)) + geom_point(alpha = 0.03)))+ ylab("log (TPM)")
+```
+
+```{r, echo=FALSE}
+threshold = 0
+
+cols = c(alpha(2,0.5), alpha(3,0.5))
+hist(data_table[data_table$total_TPM<=threshold,]$inverted_msr, breaks = 40, col = cols[1], probability = F, xlab = "inverted msr", main = "Distribution comparison")
+hist(data_table[data_table$total_TPM>threshold,]$inverted_msr, breaks = 40, col = cols[2], add = T, probability = F)
+
+legend("top", legend=c(paste("TPM <=",threshold), c(paste("TPM >",threshold))), col=cols, fill = cols)
+```
+
+```{r, echo=FALSE}
+threshold = 0
+
+cols = c(alpha(2,0.5), alpha(3,0.5))
+hist(data_table[data_table$total_TPM<=threshold,]$msr_density, breaks = 40, col = cols[1], probability = F, xlab = "discretized meth rate", main = "Distribution comparison", ylim = c(0,3000))
+hist(data_table[data_table$total_TPM>threshold,]$msr_density, breaks = 40, col = cols[2], add = T, probability = F, ylim = c(0,3000))
+
+legend("top", legend=c(paste("TPM <=",threshold), c(paste("TPM >",threshold))), col=cols, fill = cols)
+```
+
+```{r, echo=FALSE}
+# DATASET
+
+model_data = data_table[complete.cases(data_table[,msr_predictors]),]
+cat("missing data: ", (1-(length(model_data[,1])/length(data_table[,1])))*100, "%")
+
+# UNDERSAMPLING
+train_prop = 0.2; cat("\ntrain_data_proportion: ", train_prop)
+random = T
+
+l = length(model_data[,1])
+train_length = train_prop*l
+
+if(random) 
+{
+  train_rows = sample(1:l, size = train_length, replace = F)
+} else train_rows = 1:train_length
+
+test_rows = (1:l)[-train_rows]
+
+train_model_data = model_data[train_rows,]
+test_model_data = model_data[test_rows,]
+```
+
+The fraction of fragments that have TPM>0 (train data)
+```{r, echo=FALSE}
+mean(train_model_data$total_TPM>threshold, na.rm=T)
+```
+
+Logistic Regression Model for TPM presence with basic predictors (nucleotides, CpG_density, meth rate, msr_density):
+
+```{r, echo=FALSE}
+
+# Logistics Regression
+glm.fit <- glm(train_model_data$total_TPM>threshold ~ nucleotides+CpG_density+`meth rate`+ msr_density , data = train_model_data, family = binomial)
+
+
+#summary(glm.fit)
+cat("TRAIN DATA ")
+nd <- train_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$total_TPM>threshold
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2], "\n\n")
+
+cat("TEST DATA ")
+nd <- test_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$total_TPM>threshold
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
+```
+
+
+Logistic Regression Model with inverted_msr as predictor
+```{r, echo=FALSE}
+glm.fit <- glm(train_model_data$total_TPM>threshold ~ inverted_msr , data = train_model_data, family = binomial)
+
+#summary(glm.fit)
+cat("TRAIN DATA")
+nd <- train_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$total_TPM>threshold
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2], "\n\n")
+
+cat("TEST DATA")
+nd <- test_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$total_TPM>threshold
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
+
+```
+
+
+Logistic Regression Model with all predictors
+```{r, echo=FALSE}
+glm.fit <- glm(train_model_data$total_TPM>threshold ~ . , data = train_model_data[, c(basic_predictors, msr_predictors)], family = binomial)
+
+#summary(glm.fit)
+cat("TRAIN DATA")
+nd <- train_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$total_TPM>threshold
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2], "\n\n")
+
+cat("TEST DATA")
+nd <- test_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$total_TPM>threshold
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
+
+```
+
+
+
+#### Predicting log(TPM)
+Distribution of TPM values (only for regions that contains some genes)
+```{r, echo=FALSE}
+hist(log(model_data[model_data$gene_count>0, ]$total_TPM+1e-3, base = 10), xlab = "log(TPM + 1e-3)", main = "", breaks = 50)
+```
+
+
+
+Linear model for TPM with standard predictors, available information about genes:
+```{r, echo=FALSE}
+
+standard_predictors = c(essentials, "genes_nucleotides_count")
+model = lm(log_tpm ~ . , data = train_model_data[, standard_predictors])
+summary(model)
+
+cat("Test data R squared: ", 1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )
+```
+
+Linear model for TPM with all features and MSR statistics, available information about genes:
+```{r, echo=FALSE}
+model = lm(log_tpm ~ . , data = train_model_data[, c(standard_predictors, msr_predictors)])
+summary(model)
+
+cat("Test data R squared: ", 1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )
+```
+
+
+Linear model for TPM with adding inverted msr, available information about genes:
+
+```{r, echo=FALSE}
+model = lm(log_tpm ~ ., data = train_model_data[, c(standard_predictors, "inverted_msr")])
+summary(model)
+
+cat("Test data R squared: ", 1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )
+```
+
+
+Linear model for TPM with basic features but no information about genes:
+```{r, echo=FALSE}
+model = lm(log_tpm ~ ., data = train_model_data[, c("log_tpm", basic_predictors)])
+summary(model)
+
+cat("Test data R squared: ", 1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )
+```
+
+
+Linear model for TPM with all features but no information about genes:
+```{r, echo=FALSE}
+model = lm(log_tpm ~ ., data = train_model_data[, c("log_tpm", basic_predictors, msr_predictors)])
+summary(model)
+
+cat("Test data R squared: ", 1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )
+```
+
+Linear model for TPM with inverted msr but no information about genes:
+```{r, echo=FALSE}
+model = lm(log_tpm ~ ., data = train_model_data[, c("log_tpm", basic_predictors, "inverted_msr")])
+summary(model)
+
+cat("Test data R squared: ", 1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )
+```

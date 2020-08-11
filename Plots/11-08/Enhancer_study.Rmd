@@ -1,0 +1,132 @@
+---
+title: "Enhancer study"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(fig.width=20, fig.height=12) 
+
+#setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
+#source("Methylation-project/Code/expression_and_msr_experiment.R", chdir = T)
+```
+
+
+
+```{r, include=FALSE}
+library("PerformanceAnalytics")
+setwd(dir = "../../../")
+source("Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
+genebody <- readRDS("Rexperiments/genebody_improved.Rda")
+
+names <- c("left_ventricle", "ovary", "stomach", "lung", "gm23248", "H1", "K562", "Hela_S3")
+Enhancers = readRDS("Rexperiments/Enhancers_with_indexes.Rda")
+
+rna_files <- c("MethylationCode/MethylationData/rna-seq/ENCFF860DPP_left_ventricle_male_34.tsv",
+              "MethylationCode/MethylationData/rna-seq/ENCFF061BJL_ovary_53_gene_quantifications.tsv",
+              "MethylationCode/MethylationData/rna-seq/ENCFF918KPC_stomach.tsv",
+              "MethylationCode/MethylationData/rna-seq/ENCFF947WLV_lung_30_gene_quantifications.tsv",
+              "MethylationCode/MethylationData/rna-seq/ENCFF775DYT_gm23248_polyA.tsv",
+              "MethylationCode/MethylationData/rna-seq/ENCFF653XHG_H1.tsv",
+              "MethylationCode/MethylationData/rna-seq/K562.tsv",
+              "MethylationCode/MethylationData/rna-seq/ENCFF796REI_HeLa_S3_polyA.tsv")
+
+wgbs_files <- c("MethylationCode/MethylationData/wgbs/ENCFF536RSX_left_ventricle_male_34.rda",
+                "MethylationCode/MethylationData/wgbs/ENCFF303ZGP_ovary_53_female.rda",
+                "MethylationCode/MethylationData/wgbs/stomach.Rda",
+                "MethylationCode/MethylationData/wgbs/ENCFF039JFT_lung_30_female.rda",
+                "MethylationCode/MethylationData/wgbs/ENCFF752NXS_GM23248.rda",
+                "MethylationCode/MethylationData/wgbs/H1.Rda",
+                "MethylationCode/MethylationData/wgbs/K562.Rda",
+                "MethylationCode/MethylationData/wgbs/HeLa_S3.Rda")
+
+```
+
+```{r, include=FALSE}
+Enhancers$basis_count <- Enhancers$end - Enhancers$start
+Enhancers$cg_count <- Enhancers$i_end - Enhancers$i_start + 1
+Enhancers$cg_count[is.infinite(Enhancers$cg_count)] <- 0
+Enhancers$cg_density <- Enhancers$cg_count*2/Enhancers$basis_count
+
+```
+
+Enhancers length distribution:
+```{r, echo=FALSE}
+hist(Enhancers$basis_count, breaks = 40, main = "number of basis for each enhancer", xlab = "basis length")
+```
+
+
+CpG density distribution on Enhancers:
+```{r, echo=FALSE}
+hist(Enhancers$cg_density, breaks = 40, main = "fraction of basis that belong to a CG site")
+```
+
+Average CpG density on Enhancers:
+```{r, echo=FALSE}
+mean(Enhancers$cg_density)
+```
+
+
+```{r, include=FALSE}
+setwd("../../../")
+enhancers_meth_prop <- lapply(1:length(names), function(i)
+  {
+  file <- wgbs_files[i]
+  d <- sum_strands(readRDS(file))
+  p <- d$prop
+  remove(d)
+  gc()
+  sapply(1:length(Enhancers$i_start), function(j) 
+    {
+    if(is.infinite(Enhancers$i_start[j])) return(NA)
+    mean(p[(Enhancers$i_start[j]):(Enhancers$i_end[j])], na.rm = T)})
+  
+  })
+
+enhancers_meth_prop <- data.frame(enhancers_meth_prop)
+colnames(enhancers_meth_prop) <- names
+```
+
+
+Methilation proportion correlation on Enhancers:
+```{r, echo=FALSE}
+corrplot(cor(na.omit(enhancers_meth_prop)),  method = "number")
+```
+
+Binaryzed Enhancers, proportion of equal enhancers:
+```{r, echo=FALSE}
+f <- function(a,b) {1-mean(abs(a-b), na.rm = T)}
+pairwise.plot(enhancers_meth_prop>=50, f)*100
+```
+
+```{r, include=FALSE}
+setwd(dir = "../../../")
+rna_data <- lapply(rna_files, read_rna_file)
+
+
+rna_data <- lapply(rna_data, function(x) {x[x$gene_id %in% genebody$id]})
+rna_data <- lapply(rna_data, function(x) {x[!duplicated(x$gene_id), ]})
+
+g = rna_data[[1]]$gene_id
+for(x in rna_data)
+{
+  g = intersect(g, x$gene_id)
+}
+
+rna_data <- lapply(rna_data, function(x) {x[x$gene_id %in% g,TPM]})
+#rna_data <- lapply(rna_data, function(x) {x$TPM})
+rna_data <- data.frame(rna_data)
+colnames(rna_data) <- names
+rna_data <- log(rna_data+1e-3)
+gc()
+#########################
+```
+
+Correlation in gene expression ( log(TPM+1e-3) ): 
+```{r, echo=FALSE}
+corrplot(cor(na.omit(rna_data)),  method = "number")
+```
+
+
+
+
