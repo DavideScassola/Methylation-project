@@ -1,0 +1,177 @@
+---
+title: "msr_and_Expr_esperiments"
+author: "Davide Scassola"
+date: "24 agosto 2020"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, include=FALSE}
+library("PerformanceAnalytics")
+library(ggplot2)
+library(ggExtra)
+setwd(dir = "../../../")
+source("Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
+msr_ecdf_1e3 = readRDS("MethylationCode/MethylationData/msr_ecdf_1e3.Rda")
+
+##########################
+genebody = readRDS("Rexperiments/genebody_improved.Rda")
+##########################
+
+y <- c("gene_count", "log_tpm")
+basic_predictors <- c("nucleotides", "CpG_density", "meth rate", "msr_density")
+essentials <- c(y, basic_predictors)
+essential_msr_predictors <- c("msr", "inverted_msr")
+fancy_msr_predictors <- c("ecdf", "inverted ecdf", "residual", "inverted_residual")
+msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
+```
+
+
+```{r, include=FALSE}
+msr_fragments_table = readRDS("../../../Rexperiments/ENCFF752NXS_GM23248_msr_table_1000.Rda")
+rna_fragment_table = readRDS("../../../Rexperiments/ENCFF752NXS_GM23248_rna_table_1000_extended.Rda")
+```
+
+
+
+The DataFrame is the following (excluding some columns for readability):
+```{r, echo=FALSE}
+data_table <- join_rna_and_msr_table(rna_fragment_table, msr_fragments_table)
+#tpm_noise <- rexp(length(data_table$log_tpm), rate = 1e3)
+log_tpm_noise <- rnorm(length(data_table$log_tpm), sd = 0.5)
+log_tpm_noise[data_table$total_TPM>0] <- 0
+
+data_table$log_tpm_noisy <- data_table$log_tpm + log_tpm_noise
+
+data_table <- exclude_outliers(data_table, lim = 2.5e5)
+#data_table$log_tpm[data_table$gene_count==0] = NA
+#data_table <- exclude_outliers(data_table, lim = 2e6)
+data_table$group <- as.factor(data_table$total_TPM>1)
+data_table <- (data_table[, -c(8)])
+cat("\ntotal TPM: ", sum(data_table$total_TPM/1e6, na.rm = T))
+```
+
+
+```{r, include=FALSE}
+between <- function(v, minimum, maximum) { return((v >= minimum) & (v < maximum)) }
+
+msr_class_scatter <- function(df, minimum, maximum, msrn, xn, yn)
+{
+  msr <- df[, msrn]
+  x <- df[, xn]
+  y <- df[, yn] 
+  d <- na.omit(data.frame(msr, x, y))
+  d <- d[between(d$msr, minimum, maximum), ]
+  
+  ggplot(d, aes(x, y)) + geom_point(alpha = 0.2) + labs(x = xn, y=yn, title = paste(msrn, " in ", "[", minimum, ",", maximum, ")", sep=""))
+}
+
+msr_class_box <- function(df, msrn, yn, digits = 2)
+{
+  msr <- df[, msrn]
+  msr <- as.factor(round(msr, digits))
+  y <- df[, yn] 
+  d <- na.omit(data.frame(msr, y))
+  
+  #ls <- linspace(min(d$msr), max(d$msr), n)
+  
+  ggplot(d, aes(msr, y)) + labs(x = msrn, y=yn) + geom_boxplot()
+}
+
+scatter_color <- function(df, cn, xn, yn, undersample = NA)
+{
+  c1 <- '#666699'
+  c2 <- '#00b300'
+  
+  c <- df[, cn]
+  x <- df[, xn]
+  y <- df[, yn] 
+  d <- na.omit(data.frame(c, x, y))
+  
+  if(!is.na(undersample))
+    d <- d[sample(1:length(d[,1]), size = undersample), ]
+  
+  ggplot(d, aes(x, y, color=c)) + geom_point(alpha = 0.8) + scale_colour_gradient(low = c1, high = "green", na.value = NA, name = cn) + theme(legend.position=c(0,1), legend.justification=c(0,1)) + labs(x = xn, y=yn, title = " ")
+}
+```
+
+
+```{r, include=FALSE}
+scatter_color(data_table, "msr", "msr_density", "log_tpm_noisy", 1000)
+msr_class_scatter(data_table, 0,0.2,"inverted_msr", "msr_density", "log_tpm_noisy")
+msr_class_box(data_table, "inverted_msr", "log_tpm_noisy")
+```
+
+```{r, include=FALSE}
+
+
+
+```
+
+```{r, include=FALSE}
+c1 <- '#666699'
+c2 <- '#00b300'
+
+# scatter plot of x and y variables
+# color by groups
+scatterPlot <- ggplot(df[sample(1:length(df[,1]), size = 10e3), ], aes(x, y, color=group)) + geom_point(alpha = 0.8) + scale_color_manual(values = c(c1,c2), labels = c("TPM=0", "TPM>0")) + theme(legend.position=c(0,1), legend.justification=c(0,1)) + labs(x = "methylation rate", y="ECDF(0)", title = "stomach, fragments of 1000 CG sites")
+scatterPlot
+
+scatterPlot <- ggplot(df[sample(1:length(df[,1]), size = 10e3), ], aes(x, y, color=ltpm)) + geom_point(alpha = 1) + scale_colour_gradient(low = c1, high = "green", na.value = NA, name = "log(TPM)") + theme(legend.position=c(0,1), legend.justification=c(0,1)) + labs(x = "meth rate", y="ecdf(0)", title = "Stomac tissue, fragments of 1000 CG sites")
+scatterPlot
+
+# Marginal density plot of x (top panel)
+xdensity <- ggplot(df, aes(x, fill=group)) + 
+    geom_density(alpha=.5) + 
+    scale_fill_manual(values = c(c1,c2), labels = c("TPM=0", "TPM>0")) + scale_color_manual(values = c(c1,c2)) + theme(legend.position=c(0,1), legend.justification=c(0,1)) + labs(x = "meth rate", title = "Stomach tissue, fragments of 1000 CG sites")
+
+# Marginal density plot of y (right panel)
+ydensity <- ggplot(df, aes(y, fill=group)) + 
+    geom_density(alpha=.5) + 
+    scale_fill_manual(values = c(c1,c2), labels = c("TPM=0", "TPM>0")) + scale_color_manual(values = c(c1,c2)) + theme(legend.position=c(0.5,1), legend.justification=c(0,1)) + labs(x = "ecdf(0)", title = "Stomach tissue, fragments of 1000 CG sites")
+
+```
+
+
+```{r, include=FALSE}
+c1 <- '#666699'
+c2 <- '#00b300'
+
+# scatter plot of x and y variables
+# color by groups
+ggplot(df[sample(1:length(df[,1]), size = 2e3), ], aes(x, y, color=group)) + geom_point(alpha = 1) + scale_color_manual(values = c(c1,c2), labels = c("TPM=0", "TPM>0")) + theme(legend.position=c(0,1), legend.justification=c(0,1)) + labs(x = "meth rate", y="MSR(0)", title = "GM23248, fragments of 1000 CG sites")
+```
+
+
+```{r, include=FALSE}
+df <- data.frame(data_table$msr_density, data_table$msr, data_table$inverted_msr, data_table$log_tpm)
+colnames(df) <- c("meth rate", "MSR(1)", "MSR(0)", "log(TPM)")
+chart.Correlation( df[sample(1:length(df[,1]), size = 1e3), c(1,3,4)])
+```
+
+
+
+```{r, include=FALSE}
+conf <- 0.9999;
+alpha <- (1-conf)/2
+up <- 1-alpha; down <- alpha
+xspace <- linspace(0.02, 0.98, 100)
+median_f <- extract_ecdf_function(msr_ecdf_1e3, 0.5)(xspace)
+up_f <- extract_ecdf_function(msr_ecdf_1e3, up)(xspace)
+down_f <- extract_ecdf_function(msr_ecdf_1e3, down)(xspace)
+cdf <- data.frame(xspace, median_f, up_f, down_f)
+
+r <- sample(1:length(df[,1]), size = 2e3)
+plot(x[r], y[r], pch = 21, ylim = c(0.08,0.35), xlab = "methylation rate", ylab = "MSR(0)",main = "Stomach tissue, fragments of 1000 CG sites, comparison with randomly simulated data")
+lines(1-xspace, median_f, col = 2, lty = 2, lwd=3)
+lines(1-xspace, down_f, col = 3, lty = 2, lwd=3)
+lines(1-xspace, up_f, col = 3, lty = 2, lwd=3)
+
+legend("topleft", legend=c(paste(conf, "confidence interval"), "median"), col=c(3,2), lty = 2, lwd=3, cex = 1, y.intersp = 0.5)
+
+```

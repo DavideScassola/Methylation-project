@@ -1,0 +1,266 @@
+---
+title: "multiple_regressions"
+author: "Davide Scassola"
+date: "25 agosto 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r, include=FALSE}
+library(ggfortify)
+library("PerformanceAnalytics")
+setwd(dir = "../../../")
+source("Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
+
+
+##########################
+genebody = readRDS("Rexperiments/genebody_improved.Rda")
+##########################
+
+y <- c("gene_count", "log_tpm")
+basic_predictors <- c("nucleotides", "CpG_density", "meth rate", "msr_density")
+essentials <- c(y, basic_predictors)
+essential_msr_predictors <- c("msr", "inverted_msr")
+fancy_msr_predictors <- c("ecdf", "inverted ecdf", "residual", "inverted_residual")
+msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
+```
+
+
+```{r, include=FALSE}
+dir <- "../../../Rexperiments/"
+names <- c("left_ventricle", "ovary", "stomach", "lung", "gm23248", "H1", "K562")
+l <- length(names)
+
+msrL <- lapply(names, function(x) {get_file_names(dir, c("msr", "1000", x), T)[1] })
+msr_fragments_tables = lapply(msrL, readRDS)
+
+rnaL <- lapply(names, function(x) {get_file_names(dir, c("rna", "table", "1000", x), T)[1] })
+rna_fragments_tables = lapply(rnaL, readRDS)
+
+data_tables <- lapply(1:l, function(i)
+  {
+  a <- join_rna_and_msr_table(rna_fragments_tables[[i]], msr_fragments_tables[[i]])
+  exclude_outliers(a, lim = 2.5e5)
+  }) 
+remove(msr_fragments_tables); remove(rna_fragments_tables); gc()
+```
+
+
+
+```{r, echo=FALSE}
+# DATASET
+train_prop = 0.5; cat("\ntrain_data_proportion: ", train_prop)
+random = T
+
+model_datas <- lapply(1:l, function(i)
+  {
+  dt <- data_tables[[i]]
+  name <- names[i]
+  md <- dt[complete.cases(dt[,msr_predictors]),]
+  cat("\n", name, " missing data: ", (1-(length(md[,1])/length(dt[,1])))*100, "%")
+
+  # UNDERSAMPLING
+  
+  l = length(md[,1])
+  train_length = train_prop*l
+  
+  if(random) 
+  {
+    train_rows = sample(1:l, size = train_length, replace = F)
+  } else train_rows = 1:train_length
+  
+  test_rows = (1:l)[-train_rows]
+  
+  train_model_data = md[train_rows,]
+  test_model_data = md[test_rows,]
+  
+  List(train_model_data=train_model_data, test_model_data=test_model_data, name=name)
+  
+  })
+
+
+y <- c("gene_count", "log_tpm")
+basic_predictors <- c("nucleotides", "CpG_density", "`meth rate`", "msr_density")
+essentials <- c(y, basic_predictors)
+essential_msr_predictors <- c("msr", "inverted_msr")
+fancy_msr_predictors <- c("ecdf", "`inverted ecdf`", "residual", "inverted_residual")
+msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
+
+```
+
+
+
+
+```{r, echo=FALSE}
+
+
+test_models <- function(model_datas, y, predictors)
+{
+    cat("\n")
+  formul <- as.formula(paste(y, "~", paste(predictors, collapse = " + ")))
+  sapply(model_datas, function(md)
+    {
+      train_model_data <- md$train_model_data
+      test_model_data <- md$test_model_data
+      model <- lm(formul, data = train_model_data)
+
+   trsq <- 1-(var(predict(model, test_model_data,   type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm)
+   
+         cat(md$name, ": ", trsq, "\n")
+         trsq
+    })
+}
+
+test_a_model <- function(model_datas, model_index, y, predictors)
+{
+    cat("\n")
+  formul <- as.formula(paste(y, "~", paste(predictors, collapse = " + ")))
+  model <- lm(formul, data = model_datas[[model_index]]$train_model_data)
+  sapply(model_datas, function(md)
+    {
+      test_model_data <- md$test_model_data
+      
+   trsq <- 1-(var(predict(model, test_model_data,   type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm)
+   
+         cat(md$name, ": ", trsq, "\n")
+         trsq
+    })
+}
+
+
+```
+
+
+```{r, echo=FALSE}
+r1 <- test_models(model_datas, "log_tpm", basic_predictors)
+r2 <- test_models(model_datas, "log_tpm", c(basic_predictors, essential_msr_predictors))
+r3 <- test_models(model_datas, "log_tpm", c(basic_predictors, essential_msr_predictors, fancy_msr_predictors))
+r4 <- test_models(model_datas, "log_tpm", c(basic_predictors, "residual"))
+r5 <- test_models(model_datas, "log_tpm", c(basic_predictors, essential_msr_predictors, "ecdf"))
+r5 <- test_models(model_datas, "log_tpm", c(basic_predictors, "`inverted ecdf`"))
+
+
+```
+
+```{r, echo=FALSE}
+r3-r1
+((r3/r1)-1)*100
+((r5/r1)-1)*100
+((r3/r5)-1)*100
+```
+
+```{r, echo=FALSE}
+y <- c("gene_count", "log_tpm")
+basic_predictors <- c("nucleotides", "CpG_density", "meth rate", "msr_density")
+essentials <- c(y, basic_predictors)
+essential_msr_predictors <- c("msr", "inverted_msr")
+fancy_msr_predictors <- c("ecdf", "inverted ecdf", "residual", "inverted_residual")
+msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
+
+df <- model_datas[[1]]$train_model_data
+df <- df[,c("log_tpm", basic_predictors, msr_predictors)]
+df.pca <- prcomp(df, center = TRUE,scale. = TRUE)
+
+summary(df.pca)
+autoplot(df.pca, data = df, colour = 'log_tpm',
+         loadings = TRUE, loadings.colour = 'blue',
+         loadings.label = TRUE, loadings.label.size = 6)
+
+```
+
+
+
+```{r, echo=FALSE}
+
+y <- c("gene_count", "log_tpm")
+basic_predictors <- c("nucleotides", "CpG_density", "`meth rate`", "msr_density")
+essentials <- c(y, basic_predictors)
+essential_msr_predictors <- c("msr", "inverted_msr")
+fancy_msr_predictors <- c("ecdf", "`inverted ecdf`", "residual", "inverted_residual")
+msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
+
+
+r1 <- test_a_model(model_datas, 3, "log_tpm", basic_predictors)
+r2 <- test_a_model(model_datas, 3, "log_tpm", c(basic_predictors, essential_msr_predictors))
+r3 <- test_a_model(model_datas, 3, "log_tpm", c(basic_predictors, essential_msr_predictors, fancy_msr_predictors))
+r4 <- test_a_model(model_datas, 3, "log_tpm", c("`inverted ecdf`"))
+r5 <- test_a_model(model_datas, 3, "log_tpm", c(basic_predictors, "`inverted ecdf`"))
+
+```
+
+
+```{r, echo=FALSE}
+
+x <- model_datas[[1]]$train_model_data; x$tissue <- as.factor(model_datas[[1]]$name)
+for(i in 2:(l-1))
+{
+  d <- model_datas[[i]]$train_model_data
+  d$tissue <- as.factor(model_datas[[i]]$name)
+  x <- rbind(x, d)
+}
+
+test <- model_datas[[1]]$test_model_data; test$tissue <- as.factor(model_datas[[1]]$name)
+for(i in 2:(l-1))
+{
+  d <- model_datas[[i]]$test_model_data
+  d$tissue <- as.factor(model_datas[[i]]$name)
+  test <- rbind(test, d)
+}
+
+```
+
+```{r, echo=FALSE}
+y <- c("gene_count", "log_tpm")
+basic_predictors <- c("nucleotides", "CpG_density", "meth rate", "msr_density")
+essentials <- c(y, basic_predictors)
+essential_msr_predictors <- c("msr", "inverted_msr")
+fancy_msr_predictors <- c("ecdf", "inverted ecdf", "residual", "inverted_residual")
+msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
+
+basic_model <- lm(log_tpm ~ ., x[, c("log_tpm", basic_predictors)])
+#summary(model)
+tmse(basic_model, test, "log_tpm")
+
+essential_model <- lm(log_tpm ~ ., x[, c("log_tpm", basic_predictors, "inverted ecdf")])
+#summary(model)
+tmse(essential_model, test, "log_tpm")
+
+full_model <- lm(log_tpm ~ ., x[, c("log_tpm", basic_predictors, msr_predictors)])
+#summary(model)
+tmse(full_model, test, "log_tpm")
+
+full_model <- lm(log_tpm ~ ., x[, c("log_tpm", basic_predictors, essential_msr_predictors, "ecdf", "inverted ecdf")])
+#summary(model)
+tmse(full_model, test, "log_tpm")
+```
+
+```{r, echo=FALSE}
+cat("\n\nbasic model")
+for(nam in names)
+{
+  cat("\n", nam, ":", tmse(basic_model, test[test$tissue==nam, ], "log_tpm"))
+}
+
+cat("\n\nessential_model")
+for(nam in names)
+{
+  cat("\n", nam, ":", tmse(essential_model, test[test$tissue==nam, ], "log_tpm"))
+}
+
+cat("\n\nfull_model")
+for(nam in names)
+{
+  cat("\n", nam, ":", tmse(full_model, test[test$tissue==nam, ], "log_tpm"))
+}
+
+```
+
+```{r, echo=FALSE}
+summary(essential_model)
+
+```

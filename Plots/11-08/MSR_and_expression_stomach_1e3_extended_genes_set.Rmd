@@ -15,6 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, include=FALSE}
 library("PerformanceAnalytics")
+library("MASS")
 setwd(dir = "../../../")
 source("Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
 
@@ -24,7 +25,7 @@ genebody = readRDS("Rexperiments/genebody_improved.Rda")
 ##########################
 
 y <- c("gene_count", "log_tpm")
-basic_predictors <- c("nucleotides", "CpG_density", "meth rate", "msr_density")
+basic_predictors <- c("nucleotides", "CpG_density", "meth rate", "meth_autocorrelation")
 essentials <- c(y, basic_predictors)
 essential_msr_predictors <- c("msr", "inverted_msr")
 fancy_msr_predictors <- c("ecdf", "inverted ecdf", "residual", "inverted_residual")
@@ -33,9 +34,9 @@ msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
 
 
 ```{r, include=FALSE}
-msr_fragments_table = readRDS("../../../Rexperiments/stomach_msr_table_1000.Rda")
+wgbs <- sum_strands(readRDS("../../../MethylationCode/MethylationData/wgbs/stomach.Rda")); gc()
+msr_fragments_table = readRDS("../../../Rexperiments/stomach_bin_method_msr_table_1000.Rda")
 rna_fragment_table = readRDS("../../../Rexperiments/stomach_rna_table_1000_extended.Rda")
-
 #########################
 ```
 
@@ -43,7 +44,13 @@ rna_fragment_table = readRDS("../../../Rexperiments/stomach_rna_table_1000_exten
 
 The DataFrame is the following (excluding some columns for readability):
 ```{r, echo=FALSE}
+
+
 data_table <- join_rna_and_msr_table(rna_fragment_table, msr_fragments_table)
+
+
+data_table$meth_autocorrelation <- meth_autoc(wgbs, data_table)
+
 #tpm_noise <- rexp(length(data_table$log_tpm), rate = 1e3)
 log_tpm_noise <- rnorm(length(data_table$log_tpm), sd = 0.5)
 log_tpm_noise[data_table$total_TPM>0] <- 0
@@ -79,18 +86,19 @@ TPM for regions with 0 genes is considered 0.
 ###### Basic features:
 
 ```{r, echo=FALSE}
-chart.Correlation(data_table[,essentials])
+rows <- sample(1:length(data_table[,1]), size = 4e3)
+chart.Correlation(data_table[rows,essentials])
 ```
 
 
 ###### Comparison with simple MSR statistics:
 ```{r, echo=FALSE}
-chart.Correlation(data_table[,c(essentials, essential_msr_predictors)])
+chart.Correlation(data_table[rows,c(essentials, essential_msr_predictors)])
 ```
 
 ######Comparison with other MSR statistics:
 ```{r, echo=FALSE}
-chart.Correlation(data_table[,c(y, fancy_msr_predictors)])
+chart.Correlation(data_table[rows,c(y, fancy_msr_predictors, "meth_autocorrelation")])
 ```
 
 ```{r, echo=FALSE, warning=FALSE}
@@ -109,7 +117,7 @@ library(ggExtra)
 
 
 ```{r, echo=FALSE, warning=FALSE}
-((ggplot(data_table,aes(x=residual,y=log_tpm)) + geom_point(alpha = 0.03)))+ ylab("log (TPM)")
+((ggplot(data_table,aes(x=meth_autocorrelation,y=log_tpm)) + geom_point(alpha = 0.03)))+ ylab("log (TPM)")
 ```
 
 ```{r, echo=FALSE, warning=FALSE}
@@ -139,7 +147,7 @@ legend("top", legend=c(paste("TPM <=",threshold), c(paste("TPM >",threshold))), 
 ```{r, echo=FALSE}
 # DATASET
 
-model_data = data_table[complete.cases(data_table[,msr_predictors]),]
+model_data = data_table[complete.cases(data_table[,c(basic_predictors,msr_predictors)]),]
 cat("missing data: ", (1-(length(model_data[,1])/length(data_table[,1])))*100, "%")
 
 # UNDERSAMPLING
@@ -164,6 +172,26 @@ The fraction of fragments that have TPM>0 (train data)
 ```{r, echo=FALSE}
 mean(train_model_data$total_TPM>threshold, na.rm=T)
 ```
+
+
+```{r, echo=FALSE}
+#
+# glm.fit <- glm.nb(train_model_data$gene_count ~ . , data = train_model_data[, c("gene_count",basic_predictors)])
+# tmse(glm.fit, test_model_data, "gene_count")
+# 
+# glm.fit <- glm.nb(train_model_data$gene_count ~ . , data = train_model_data[, c("gene_count","residual")])
+# tmse(glm.fit, test_model_data, "gene_count")
+# 
+# glm.fit <- glm.nb(train_model_data$gene_count ~ . , data = train_model_data[, c("gene_count",basic_predictors, "residual")])
+# tmse(glm.fit, test_model_data, "gene_count")
+# 
+# 
+# glm.fit <- glm.nb(train_model_data$gene_count ~ . , data = train_model_data[, c("gene_count",basic_predictors, msr_predictors)])
+# tmse(glm.fit, test_model_data, "gene_count")
+
+```
+
+
 
 Logistic Regression Model for TPM presence with basic predictors (nucleotides, CpG_density, meth rate, msr_density):
 
