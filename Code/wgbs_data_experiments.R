@@ -32,7 +32,7 @@ load("../../Rexperiments/stomach_fragments_table.Rdata")
 load("../../Rexperiments/H1_fragments_table_discrete.Rdata")
 load("../../Rexperiments/stomach_fragments_table_discrete.Rdata")
 #load("../../Rexperiments/H1_fragments_table_discrete.Rdata")
-#load("../../Rexperiments/stomach_fragments_table_discrete.Rdata")
+load("../../Rexperiments/stomach_fragments_table_discrete.Rdata")
 #load(file = "../../Rexperiments/CG_exp_small.Rdata")
 ####################################################
 
@@ -83,7 +83,7 @@ density_MSR_correlation <- function(exp, explanation, fix = T, windows = c("1e3"
     msr = exp[[i]]$data$fragments_infos_array[,3]
     if(fix)
     {
-      plot(density,msr, xlim = c(0,1), ylim = c(0,0.32), col = alpha(1,0.5))
+      plot(density,msr, xlim = c(0,1), ylim = c(0,0.32), col = alpha(1,0.9))
     }
     else
     {

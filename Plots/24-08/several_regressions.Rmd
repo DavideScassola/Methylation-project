@@ -97,8 +97,6 @@ msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
 
 
 ```{r, echo=FALSE}
-
-
 test_models <- function(model_datas, y, predictors)
 {
     cat("\n")
@@ -137,14 +135,14 @@ test_a_model <- function(model_datas, model_index, y, predictors)
 
 
 ```{r, echo=FALSE}
+# A MODEL FOR EACH TISSUE
+
 r1 <- test_models(model_datas, "log_tpm", basic_predictors)
 r2 <- test_models(model_datas, "log_tpm", c(basic_predictors, essential_msr_predictors))
 r3 <- test_models(model_datas, "log_tpm", c(basic_predictors, essential_msr_predictors, fancy_msr_predictors))
 r4 <- test_models(model_datas, "log_tpm", c(basic_predictors, "residual"))
 r5 <- test_models(model_datas, "log_tpm", c(basic_predictors, essential_msr_predictors, "ecdf"))
 r5 <- test_models(model_datas, "log_tpm", c(basic_predictors, "`inverted ecdf`"))
-
-
 ```
 
 ```{r, echo=FALSE}
@@ -176,6 +174,7 @@ autoplot(df.pca, data = df, colour = 'log_tpm',
 
 
 ```{r, echo=FALSE}
+# MODEL OF A TISSUE TESTED ON ALL THE OTHER
 
 y <- c("gene_count", "log_tpm")
 basic_predictors <- c("nucleotides", "CpG_density", "`meth rate`", "msr_density")
@@ -195,6 +194,8 @@ r5 <- test_a_model(model_datas, 3, "log_tpm", c(basic_predictors, "`inverted ecd
 
 
 ```{r, echo=FALSE}
+
+# ONE MODEL FOR ALL TISSUES
 
 x <- model_datas[[1]]$train_model_data; x$tissue <- as.factor(model_datas[[1]]$name)
 for(i in 2:(l-1))

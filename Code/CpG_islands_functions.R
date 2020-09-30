@@ -114,7 +114,9 @@ add_wgbs_indexes <- function(Annotations_dataframe, wgbs_data, cores = 1)
   data_scheme <- (wgbs_data)[, c("chr","Cpos")]
   l = length(Annotations_dataframe$start)
   
-  anno = Annotations_dataframe[Annotations_dataframe$chr %in% levels(data_scheme$chr[1])]
+  chr_set <- levels(data_scheme$chr[1])
+  
+  anno = Annotations_dataframe[Annotations_dataframe$chr %in% chr_set]
   anno$chr = factor(anno$chr)
 
   wgbs_chr = (data_scheme$chr)
@@ -158,29 +160,79 @@ add_wgbs_indexes2 <- function(Annotations_dataframe, wgbs_data, cores = 1)
   anno$i_start <- anno$start
   anno$i_start <- NA
   anno$i_end <-anno$end
-  anno$i_end <-anno$end <- NA
+  anno$i_end <- NA
   
   s = 1
   inside_gene <- F
   for(i in 1:length(wgbs_data$Cpos))
   {
-    if(!inside_gene & (wgbs_data$Cpos[i]>=anno[s]$start) & (as.character(anno[s]$chr)==wgbs_data[i]$chr))
+    if(!inside_gene & (wgbs_data$Cpos[i]>=anno_start[s]) & (as.character(anno_chr[s])==wgbs_chr[i]))
     {
       anno$i_start[s] <- i
       inside_gene <- T
     }
-    anno$i_end[s] <- i
-    if(inside_gene & (wgbs_data$Cpos[i]<=anno[s]$end) & (as.character(anno[s]$chr)==wgbs_data[i]$chr) | (as.character(anno[s]$chr)!=wgbs_data[i]$chr))
+    
+    if(inside_gene & (((wgbs_data$Cpos[i]>anno_end[s]) & (as.character(anno_chr[s])==wgbs_chr[i])) | (as.character(anno_chr[s])!=wgbs_chr[i])))
     {
+      anno$i_end[s] <- i
       inside_gene <- F
       s <- s + 1
     }
+    if(s>l)
+      break
   }
 
   gc()
   return(anno)
   
 }
+
+add_wgbs_indexes3 <- function(Annotations_dataframe, wgbs_data, cores = 1)
+{
+  wgbs_data = sum_strands(wgbs_data)
+  data_scheme <- (wgbs_data)[, c("chr","Cpos")]
+  data_scheme$index <- 1:length(data_scheme$Cpos)
+  
+  
+  chr_set <- levels(data_scheme$chr[1])
+  anno = Annotations_dataframe[Annotations_dataframe$chr %in% chr_set, ]
+  l = length(anno$start)
+  anno$chr = factor(anno$chr)
+  
+  wgbs_chr = (data_scheme$chr)
+  anno_chr = anno$chr
+  anno_start = anno$start
+  anno_end = anno$end
+  
+  anno$i_start <- anno$start
+  anno$i_start <- NA
+  anno$i_end <-anno$end
+  anno$i_end <- NA
+  
+  actual_chr <- "ciao"
+  
+  for(g in 1:l)
+  {
+    if(anno_chr[g]!=actual_chr)
+    {
+      actual_chr <- anno_chr[g]
+      actual_data_scheme <- data_scheme[chr==as.character(actual_chr), ]
+    }
+    
+    cat(" ", g)
+    indexes <- actual_data_scheme$index[actual_data_scheme$Cpos>=anno_start[g]  & actual_data_scheme$Cpos<=anno_end[g]]
+    if(length(indexes)>0)
+    {
+      anno$i_start[g] = indexes[1]
+      #actual_data_scheme <- actual_data_scheme[indexes[1]:length(actual_data_scheme$Cpos)]
+      anno$i_end[g] = indexes[length(indexes)]
+    }
+
+  }
+  
+  return(anno)
+}
+
 
 #########################################
 
@@ -201,5 +253,32 @@ from_bed_to_annotation_with_wgbs_indexes <- function(bed_file, wgbs_data_file, c
   saveRDS(anno_improved, file = new_name)
 }
 
+#
+
+
+
 # per i topi
-#anno <- fread(file = bed_file,verbose=F, showProgress=T, stringsAsFactors = T,select = c(1,2,3,6,4,7), col.names = c("chr", "start", "end", "strand", "id", "anno"))
+#anno <- fread(file = bed_file,verbose=F, showProgress=T, stringsAsFactors = T,select = c(1,2,3,6,4,7,10), col.names = c("chr", "start", "end", "strand", "id", "anno","name"))
+
+
+# ANNOTATION HANDLING 
+# #######################################
+# anno_file <- "../../MethylationCode/MethylationData/gencode.v29.primary_assembly.annotation_UCSC_names.gtf.gz"
+# data <- fread(cmd=sprintf("zcat < %s",anno_file), verbose=F, showProgress=T, stringsAsFactors = T)
+# data <- data[,-c(2,6,8)]
+# colnames(data) <- c("chr", "type", "start", "end", "strand", "anno")
+# saveRDS(data, "../../Rexperiments/complete_annotation.rda")
+# 
+# #######################################
+# data <- readRDS("../../Rexperiments/complete_annotation.rda")
+# data$anno <- as.character(data$anno)
+# data <- data[data$type=="gene", ]
+# library(gsubfn)
+# data$gene_id <- strapplyc(data$anno, 'gene_id \"(.*)\"; gene_type', simplify = T)
+# data$gene_type <- as.factor(strapplyc(data$anno, 'gene_type \"(.*)\"; gene_name', simplify = T))
+# 
+# 
+# detailed_genes_improved  <- add_wgbs_indexes3(genebody_annotation, wgbs)
+# saveRDS(detailed_genes_improved, "../../Rexperiments/detailed_genebody_improved.Rda")
+# 
+# ###############################################################

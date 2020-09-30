@@ -354,7 +354,7 @@ different_positions_scale_by_chromosome_experiment <- function(d, size, chromoso
   return(rr_fragments_list[!is.na(rr_fragments_list)])
 }
 
-spatial_MSR_experiment_CpG_list <- function(binary, invert, window_size, fake_data, na_tolerance)
+spatial_MSR_experiment_CpG_list <- function(binary, invert, window_size, fake_data, na_tolerance, na_values_handler = replace_nas_hybrid_stochastic)
 {
   l <- length(binary)
   
@@ -375,10 +375,10 @@ spatial_MSR_experiment_CpG_list <- function(binary, invert, window_size, fake_da
   {
     cat(i, "...\n")
     sub <- binary[start_list[i]:(start_list[i]+window_size)]
-    fragments_infos_array[i,1] <- start_list[i]
-    fragments_infos_array[i,2] <- mean(sub,na.rm=T)
-    rr <- calculate_relevance_resolution_vector(sub, verbose=F, na_tolerance = na_tolerance, na_values_handler = replace_nas_hybrid_stochastic, invert = invert)
-    fragments_infos_array[i,3] <- MSR_area(rr)
+    #fragments_infos_array[i,1] <- start_list[i]
+    #fragments_infos_array[i,2] <- mean(sub,na.rm=T)
+    rr <- calculate_relevance_resolution_vector(sub, verbose=F, na_tolerance = na_tolerance, na_values_handler = na_values_handler, invert = invert)
+    #fragments_infos_array[i,3] <- MSR_area(rr)
     return(rr)
   })
   
@@ -446,7 +446,7 @@ spatial_MSR_experiment_by_chromosome <- function(pos, window_size, fake_data, mi
   return(List(fragments_infos_array=fragments_infos_array, rr_list=rr_fragments_list, get_valid_rrs=get_valid_rrs))
 }
 
-total_spatial_experiment <- function(files, sizes, inversion, names, methylation_assigner, na_tolerance, fake_data = F, minimum_reads = 1)
+total_spatial_experiment <- function(files, sizes, inversion, names, methylation_assigner, na_tolerance, fake_data = F, minimum_reads = 1, na_values_handler = replace_nas_with_bin_prop)
 {
   result = List()
   
@@ -468,7 +468,7 @@ total_spatial_experiment <- function(files, sizes, inversion, names, methylation
       result_si = lapply(sizes, function(s)
       {
         gc()
-        rrs <- spatial_MSR_experiment_CpG_list(binary, inv, s, fake_data, na_tolerance)
+        rrs <- spatial_MSR_experiment_CpG_list(binary, inv, s, fake_data, na_tolerance, na_values_handler)
         return(List(name=names[i], file= files[i],inverted=inv, window_size=s, data=rrs))
       })
       result[[paste(names[i], "inverted:", inv, sep = "_")]] <- result_si
@@ -639,7 +639,11 @@ remove_version_from_gene <- Vectorize(function(s)
 {
   if(substr(s, 1, 4)=="ENSG")
     return(substr(s, 1, 15))
-  else(return(s))
+  if(substr(s, 1, 7)=="ENSMUSG")
+    return(substr(s, 1, 18))
+  if(substr(s, 1, 4)=="ENST")
+    return(substr(s, 1, 15))
+  return(s)
 })
 
 read_rna_file <- function(file_rna, reduced = T, correct_gene_id = T)
@@ -708,10 +712,13 @@ make_rna_window_data_frame <- function(wgbs_data, rna_data, genebody_annotation,
   #end_chr = wgbs_data[i_starting_points+window]$chr
   l = length(start_position)
   
+  cat("  not found genes:", sum(! (rna_data$gene_id %in% genebody_annotation$id)), "\n")
+  
   rna_data = rna_data[gene_id %in% genebody_annotation$id]
   
   colnames(genebody_annotation)[5] = "gene_id"
-  merged = merge(x = genebody_annotation, y = rna, by = "gene_id", all = TRUE)
+  merged = merge(x = genebody_annotation, y = rna, by = "gene_id", all = F)
+  cat("total gene set TPM:", sum(merged$TPM), "\n")
   merged$TPM[is.na(merged$TPM)] <- 0
   
   gc()
@@ -891,7 +898,7 @@ noNa <- function(d, verbose = T)
 {
   nn <- d[complete.cases(d),]
   if(verbose)
-    cat("NAs: ", length(d[,1])-length(nn[,1]), length(d[,1])/length(nn[,1]),"%\n")
+    cat("NAs: ", length(d[,1])/length(nn[,1]),"%\n")
   return(nn)
 }
 
@@ -1009,7 +1016,289 @@ get_residuals <- function(msr, density, inverted)
   return(out)
 }
 
+show_region <- function(i, data_table, wgbs_data, size = 1000, prop = F)
+{
+  data_table_row <- data_table[i,] 
+  start = data_table_row$i_start
+  end = start+size
+  if(prop)
+  {
+    plot((wgbs_data$prop[start:end]/100))
+  }
+  else
+  {
+    d <- data_table_row[,c("msr", "inverted_msr", "ecdf", "msr_density")]
+    m <- paste("MSR(1):", round(d[1], 3) ," MSR(0):", round(d[2], 3), " ecdf:", round(d[3], 4), " rate:", round(d[4], 3))
+    plot(round(wgbs_data$prop[start:end]/100), pch = "|", ylab = " ", main = m)
+  }
+  
+  print(data_table_row[,c("msr", "inverted_msr", "residual", "total_TPM", "inverted ecdf", "msr_density")])
+}
 
 
+get_file_names <- function(dir, patterns, full.names = F)
+{
+  a <- list.files(path = dir, full.names =  full.names)
+  for(p in patterns)
+  {
+    a <- a[grepl(p, a, ignore.case = T)]
+  }
+  
+  return(a)
+}
+
+# mean distance from 1 or 0
+drift <- function(x) {mean(0.5-abs(x-0.5), na.rm=T)}
+
+tmse <- function(model, test_model_data, y_name)
+{
+  1-(var(predict(model, test_model_data,  type="response")-test_model_data[,y_name]))/var(test_model_data[,y_name])
+}
+
+tmse.glmnet <- function(model, test_model_data, y_name, x_names)
+{
+  newx = as.matrix.data.frame(test_model_data[, x_names])
+  1-(var(predict.glmnet(model, newx = newx,  type="response")-test_model_data[,y_name]))/var(test_model_data[,y_name])
+}
+
+get_genomewide_meth_positions <- function(wgbs, start, end, chr)
+{
+  wgbs$Cpos[wgbs$chr==chr & wgbs$reads>0 & wgbs$prop>=50 & wgbs$Cpos>=start & wgbs$Cpos<=end]
+}
+
+autocorrelation <- function(v, method = "pearson")
+{
+  x <- 2:length(v)
+  # nas <- sum(is.na(v))
+  # if(nas>((1-na_tolerance)*length(v)) | length(v)-nas<5)
+  #   return(NA)
+  # cor.test(v[x-1], v[x], method = method)$estimate
+  
+  tryCatch(
+    expr = {
+      return(cor.test(v[x-1], v[x], method = method)$estimate)
+    },
+    error = function(e){
+      return(NA)
+    },
+    warning = function(w){
+      return(NA)
+    },
+    finally = {
+      
+    }
+  )    
+}  
+
+meth_autoc <- function(wgbs, data_table, na_tolerance = 0.2, minimum_reads = 1, method = "pearson")
+{
+  l <- data_table$i_start[2]-data_table$i_start[1]
+  
+  prop <- wgbs$prop
+  prop[wgbs$reads<minimum_reads] <- NA
+  autoc <- sapply(data_table$i_start, function(i)
+  {
+    autocorrelation(prop[i:(i+l)], na_tolerance, method)
+  })
+  
+  return(autoc)
+}
 
 
+# doesn't work
+auto.mi <- function(wgbs, data_table, na_tolerance = 0.2, minimum_reads = 1, binaryze = T)
+{
+  l <- data_table$i_start[2]-data_table$i_start[1]
+  
+  prop <- wgbs$prop
+  prop[wgbs$reads<minimum_reads] <- NA
+  
+  if(binaryze)
+  prop <- round((prop/100)+1e-4)
+  
+  sapply(data_table$i_start[1:(length(data_table$i_start))], function(i)
+  {
+    x <- i:(i+l-1)
+    #cat(i, i+l-1, "\n")
+    if(sum(is.na(prop[x]))>((1-na_tolerance)*l))
+      return(NA)
+    fast.mutual.information((prop[x]), (prop[x+1]), method = "emp")
+  })
+
+}
+
+show_region_meth <- function(wgbs, chromosome, start, end, prop = T, genomewide = F)
+{
+  w <- wgbs[wgbs$chr == chromosome & wgbs$Cpos>=start & wgbs$Cpos<=end, ]
+  p <- w$prop/100
+  m <- length(p)
+
+  if(m<1 | all(is.na(p)))
+    return(F)
+  
+  m <- paste("CG: ", m, "  nucleotides: ", end-start, "\n", chromosome, start,"-", end,
+             "\nautocorrelation: ", round(autocorrelation(p), 2), "  drift", round(drift(p), 2))
+  #cat(p, m)
+  
+  x <- 1:length(p)
+  if(genomewide)
+    x <- w$Cpos
+    
+  if(prop)
+  {
+    plot(x, p, main=m)
+  }
+  else
+  {
+    plot(x, round(p), pch = "|", ylab = " ", main=m)
+  }
+}
+
+show_gene_meth <- function(wgbs, genebody_annotation, i, prop = T, genomewide = F, margins = 0)
+{
+  g <- genebody_annotation[i,]
+  print(g)
+  show_region_meth(wgbs, g$chr, g$start - margins, g$end + margins, prop, genomewide)
+}
+
+# chr start end strand gene_id gene_type i_start i_end CG_count CG_density meth_rate meth_rate_binary CGsites_msr CGmeth_msr CGunmeth_msr msr inverted_msr
+
+make_genes_table <- function(wgbs, genebody_annotation, gene_type_filter = NA, na_tolerance = 0.3, no_msr = F)
+{
+  data_table <- genebody_annotation
+  
+  if(!is.na(gene_type_filter))
+    data_table <- data_table[data_table$gene_type==gene_type_filter, ]
+  
+  l <- length(data_table$start)
+  data_table$CG_count <- data_table$i_end - data_table$i_start + 1
+  data_table$nucleotides <- data_table$end - data_table$start
+  data_table$CG_density <- data_table$CG_count/data_table$nucleotides
+  
+  data_table$missing_prop <- NA
+  data_table$meth_rate <- NA
+  data_table$meth_rate_binary <- NA
+  data_table$CGsites_msr <- NA
+  data_table$meth_msr <- NA
+  data_table$unmeth_msr <- NA
+  data_table$CG_list_msr <- NA
+  data_table$CG_list_inverted_msr <- NA
+  data_table$meth_autocorrelation <- NA
+  data_table$drift <- NA
+  
+  #wList <- lapply((1:length(data_table$i_start)), function(i){wgbs[data_table$i_start[i]:data_table$i_end[i], ]})
+  
+  for(i in 1:l)
+  {
+    if(!is.na(data_table$i_start[i]))
+    {
+      cat(i, "\n")
+      w <- wgbs[data_table$i_start[i]:data_table$i_end[i], ]
+      CG_pos <- w$Cpos
+      meth_CG_pos <- w[w$prop>=50]$Cpos
+      unmeth_CG_pos <- w[w$prop<50]$Cpos
+      CG_lits <- (w$prop>=50)
+      
+      data_table$missing_prop[i] <- mean(w$reads==0)
+      data_table$meth_rate[i] <- mean(w$prop, na.rm = T)/100
+      data_table$meth_rate_binary[i] <- mean(CG_lits, na.rm = T)
+      if(data_table$CG_count[i]>=20)
+        data_table$meth_autocorrelation[i] <- autocorrelation(w$prop)
+      data_table$drift[i] <- drift(w$prop/100)
+      
+      # cat(w$prop)
+      # cat("\nCG_pos", CG_pos)
+      # cat("\nmeth_CG_pos", meth_CG_pos)
+      # cat("\nCG_lits", CG_lits)
+      if(data_table$CG_count[i]>=100 & data_table$missing_prop[i]<=na_tolerance & !no_msr)
+      {
+        data_table$CGsites_msr[i] <- genome_MSR(CG_pos, minimum_bin_size = 1, max_bins = 40)
+        data_table$meth_msr[i] <- genome_MSR(meth_CG_pos, minimum_bin_size = 1, max_bins = 40)
+        data_table$unmeth_msr[i] <- genome_MSR(unmeth_CG_pos, minimum_bin_size = 1, max_bins = 40)
+        data_table$CG_list_msr[i] <- MSR_area(calculate_relevance_resolution_vector(CG_lits, na_tolerance = na_tolerance, na_values_handler = replace_nas_with_bin_prop, invert = F, verbose = F))
+        data_table$CG_list_inverted_msr[i] <- MSR_area(calculate_relevance_resolution_vector(CG_lits, na_tolerance = na_tolerance, na_values_handler = replace_nas_with_bin_prop, invert = T, verbose = F))
+      }
+    }
+  }
+  
+  return(data_table)
+}
+
+model_this <- function(response_variable_name)
+{
+  as.formula(paste(response_variable_name, "~ ."))
+}
+
+
+library(glmnet)
+
+lasso <- function(response_variable_name, df, lambda = 0.01, alpha = 1)
+{
+  x_vars <- (as.matrix.data.frame(df[, names(df) != response_variable_name]))
+  y_var <- (df[, response_variable_name])
+  lambda_seq <- 10^seq(2, log(lambda,10), by = -.1)
+  cv_output <- cv.glmnet(x_vars, y_var, alpha = alpha, lambda = lambda_seq, nfolds = 5, standardize = T)
+  glmnet(x_vars, y_var, alpha = alpha, lambda = cv_output$lambda.min)
+}
+
+produce_and_save_genes_msr_table <- function(wgbs_file, short_name, genebody_annotation_file, gene_type_filter = NA, na_tolerance = 0.3, no_msr = F, dir = "../../Rexperiments/")
+{
+  if(is.character(wgbs_file)) { wgbs <- sum_strands(readRDS(new_name)); gc() }
+  else{wgbs <- wgbs_file}
+  genebody_annotation <- readRDS(genebody_annotation_file)
+  gbt <- make_genes_table(wgbs, genebody_annotation, gene_type_filter = gene_type_filter, na_tolerance = na_tolerance, no_msr = no_msr)
+  saveRDS(gbt, paste(dir,short_name, "_genes_msr_table.Rda", sep = ""))
+}
+
+produce_and_save_fragments_msr_table <- function(wgbs_file, short_name, size, msr_ecdf_file, na_tolerance = 0.4, minimum_reads=1, methylation_assigner = standard_binaryzer, bed = NA, dir = "../../Rexperiments/")
+{
+  msr_ecdf_ref <- readRDS(msr_ecdf_file)
+  
+  # convert bed file into RDA
+  if(!is.na(bed))
+    rda_convert(wgbs_file, bed)
+  
+  # read rda file
+  if(is.character(wgbs_file))
+  {
+    wgbs <- sum_strands(readRDS(new_name)); gc()
+  }
+  else{wgbs <- wgbs_file}
+  
+  # produce msr table
+  rr_table <- total_spatial_experiment(c(new_name), c(size), c(F,T), c(short_name), methylation_assigner, na_tolerance, F, minimum_reads)
+  start = rr_table[[1]][[1]]$data$fragments_infos_array[,1]
+  msr_density = rr_table[[1]][[1]]$data$fragments_infos_array[,2]
+  true_density = sapply(start, function(x){mean(wgbs$prop[x:(x+size)], na.rm = T)})/100
+  msr = rr_table[[1]][[1]]$data$fragments_infos_array[,3]
+  inverted_msr = rr_table[[2]][[1]]$data$fragments_infos_array[,3]
+  inverted_msr[is.na(inverted_msr)] <- msr[is.na(inverted_msr)]
+  msr[is.na(msr)] <- inverted_msr[is.na(msr)]
+  sig <- significance_measure(msr, msr_density, msr_ecdf_ref, inverted = F)
+  inverted_sig <- significance_measure(inverted_msr, msr_density, msr_ecdf_ref, inverted = T)
+  median_function <- extract_ecdf_function(msr_ecdf_ref, 0.5)
+  residual <- msr-median_function(msr_density)
+  inverted_residual <- inverted_msr-median_function(1-msr_density)
+  meth_autocorrelation <- sapply(start, function(x){autocorrelation(wgbs$prop[x:(x+size)])})
+  mean_drift <- sapply(start, function(x){drift(wgbs$prop[x:(x+size)])})
+  
+  # save msr tables
+  msr_table = data.frame(start,msr_density,true_density,msr,inverted_msr, sig, inverted_sig, residual, inverted_residual, meth_autocorrelation, drift = mean_drift)
+  saveRDS(msr_table, file = paste("../../Rexperiments/",short_name, "_msr_table_", size, ".Rda", sep = ""))
+}
+
+produce_and_save_fragments_expression_table <- function(wgbs_file, short_name, rna_file, size, genebody_annotation_file = "../../Rexperiments/detailed_genebody_improved.Rda", correct_gene_id = T)
+{
+  genebody_annotation <- readRDS(genebody_annotation_file); gc()
+  rna <- read_rna_file(rna_file, reduced = F, correct_gene_id = correct_gene_id)
+
+  # read rda file
+  if(is.character(wgbs_file)) { wgbs <- sum_strands(readRDS(new_name)); gc() }
+  else{wgbs <- wgbs_file}
+  
+  if(correct_gene_id)
+    genebody_annotation$id <- remove_version_from_gene(genebody_annotation$id)
+  
+  rna_table <- make_rna_window_data_frame(wgbs, rna, genebody_annotation, size)
+  saveRDS(rna_table, file = paste("../../Rexperiments/",short_name, "_rna_table_", size, extension_tag, ".Rda", sep = ""))
+}

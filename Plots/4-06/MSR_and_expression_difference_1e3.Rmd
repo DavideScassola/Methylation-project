@@ -15,7 +15,7 @@ source("../../../Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
 
 
 y <- c("gene_count", "log_tpm")
-basic_predictors <- c("nucleotides", "CpG_density", "meth rate")
+basic_predictors <- c("nucleotides", "CpG_density", "meth rate", "meth_autocorrelation")
 essentials <- c(y, basic_predictors)
 essential_msr_predictors <- c("msr", "inverted_msr")
 fancy_msr_predictors <- c("ecdf", "inverted ecdf", "residual", "inverted_residual")
@@ -24,11 +24,12 @@ standard_predictors = c(essentials, "genes_nucleotides_count")
 all_features <- c(standard_predictors, msr_predictors)
 ```
 
-
 ```{r, include=FALSE}
+wgbs1 <- sum_strands(readRDS("../../../MethylationCode/MethylationData/wgbs/stomach.Rda")); gc()
 msr_fragments_table1 = readRDS("../../../Rexperiments/stomach_msr_table_1000.Rda")
 rna_fragment_table1 = readRDS("../../../Rexperiments/stomach_rna_table_1000_extended.Rda")
 
+wgbs2 <- sum_strands(readRDS("../../../MethylationCode/MethylationData/wgbs/ENCFF039JFT_lung_30_female.rda")); gc()
 msr_fragments_table2 = readRDS("../../../Rexperiments/ENCFF039JFT_lung_msr_table_1000.Rda")
 rna_fragment_table2 = readRDS("../../../Rexperiments/ENCFF039JFT_lung_rna_table_1000_extended.Rda")
 ```
@@ -40,9 +41,12 @@ data_table1 <- join_rna_and_msr_table(rna_fragment_table1, msr_fragments_table1)
 data_table2 <- join_rna_and_msr_table(rna_fragment_table2, msr_fragments_table2)
 
 invariant_columns = c(1,2,3,4,5,6,9,19)
+data_table1$meth_autocorrelation <- meth_autoc(wgbs1, data_table1)
+data_table2$meth_autocorrelation <- meth_autoc(wgbs2, data_table2)
 
 data_table <- data_table1
 data_table[,-invariant_columns] <- data_table1[ ,-invariant_columns] - data_table2[ ,-invariant_columns]
+
 
 data_table <- exclude_outliers(data_table, lim = 2.5e5)
 

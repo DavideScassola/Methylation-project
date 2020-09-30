@@ -48,7 +48,6 @@ The DataFrame is the following (excluding some columns for readability):
 
 data_table <- join_rna_and_msr_table(rna_fragment_table, msr_fragments_table)
 
-
 data_table$meth_autocorrelation <- meth_autoc(wgbs, data_table)
 
 #tpm_noise <- rexp(length(data_table$log_tpm), rate = 1e3)

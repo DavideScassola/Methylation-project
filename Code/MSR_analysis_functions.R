@@ -16,8 +16,10 @@ calculate_relevance_from_counts <- function(vector, M)
   return(-sum(p*log(p+1E-10, M)))
 }
 
+
 calculate_resolution_from_counts <- function(counts, M)
 {
+  M <- sum(counts)
   p <- counts/M
   return(-sum(p*log(p+1E-10,base = M)))
 }
@@ -83,10 +85,12 @@ calculate_relevance_and_resolution_ignoring_nas <- function(methylation_vector, 
 {
 
   l <- length(methylation_vector)
-  if(bin_size==1) return(c(0,1,1,1))
+  #if(bin_size==1) return(c(0,1,1,1))
+  #print(bin_size)
+  if(bin_size==l) return(c(0,0,l,NA))
   
-  starting_points <- ((1:(l/bin_size))*bin_size)-bin_size+1
-  counts  <-  cumulative_sum_vector[starting_points+bin_size]-cumulative_sum_vector[starting_points]
+  starting_points <- ((1:ceiling(l/bin_size))*bin_size)-bin_size+1
+  counts  <-  cumulative_sum_vector[pmin(starting_points+bin_size, l+1)]-cumulative_sum_vector[starting_points]
   
   if(l/bin_size > 1E8)
   {
@@ -109,6 +113,7 @@ calculate_relevance_and_resolution <- function(methylation_vector, cumulative_su
   
   l <- length(methylation_vector)
   data_size <- l-cumulative_na_vector[l+1]
+  cumulative_vector_length <- length(cumulative_sum_vector)
   
   if(bin_size==1) return(c(0,1,1,1))
   if(bin_size==l) return(c(0,0,l,NA))
@@ -118,9 +123,10 @@ calculate_relevance_and_resolution <- function(methylation_vector, cumulative_su
   start <- 1
   max_n_na <- floor(bin_size*na_tolerance)
   
-  while(start <= (l-bin_size)+1)
+  while(start <= l)
   {
-    n_of_na <- cumulative_na_vector[start+bin_size]-cumulative_na_vector[start]
+    end <- min(start+bin_size, cumulative_vector_length)
+    n_of_na <- cumulative_na_vector[end]-cumulative_na_vector[start]
       
     if(n_of_na>max_n_na)
     {
@@ -129,7 +135,8 @@ calculate_relevance_and_resolution <- function(methylation_vector, cumulative_su
     else
     {
       valid_bins_found <- valid_bins_found + 1
-      counts_and_na[,valid_bins_found] <- c(cumulative_sum_vector[start+bin_size]-cumulative_sum_vector[start], n_of_na)
+      end <- min(start+bin_size, cumulative_vector_length)
+      counts_and_na[,valid_bins_found] <- c(cumulative_sum_vector[end]-cumulative_sum_vector[start], n_of_na)
       start <- start + bin_size
     }
     
@@ -161,23 +168,26 @@ calculate_relevance_and_resolution <- function(methylation_vector, cumulative_su
   resolution <- calculate_resolution_from_counts(effective_counts, M)
 
   if(verbose) cat("bin_size:", bin_size, " valid_bins_found:", valid_bins_found, "effective data:", (bin_size*valid_bins_found)/data_size, "\n")
+
   return(c(relevance, resolution, bin_size, effective_data))
 }
 
 
-good_bin_sizes <- function(n)
-{
-  return(1:50)
-}
-
-good_bin_sizes <- function(n, max_bins = 100, losing_data_prop = 0.01)
+good_bin_sizes <- function(n, max_bins = 100, losing_data_prop = 0.1)
 {
   start <- 1
   end <- n
   
   log_spaced_bins <- unique(round((exp(linspace(log(start), log(end), n = max_bins)))))
   log_spaced_bins <- sort(unique(floor(end/log_spaced_bins)))
-  return(log_spaced_bins[((n%%log_spaced_bins)/n)<=losing_data_prop])
+  b <- log_spaced_bins[((n%%log_spaced_bins)/n)<=losing_data_prop]
+  #cat(b, "\n")
+  return(b)
+}
+
+good_bin_sizes <- function(n, max_bins = 100, losing_data_prop = NA)
+{
+  return(unique(round((exp(linspace(log(1), log(n), n = max_bins))))))
 }
 
 
@@ -204,6 +214,17 @@ calculate_relevance_resolution_vector <- function(methylation_vector, na_toleran
   }))
 }
 
+add_max_resolution_point_if_needed <- function(rr)
+{
+  if(rr[1, 1]==(0))
+    return(rr)
+  l <- length(rr[1,])
+  x <- array(NA, dim = c(4,l+1))
+  x[, 2:(l+1)] <- rr
+  x[, 1] <- c(0,1,NA, NA)
+  x
+}
+
 calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vector, max_bins = 100, verbose = T, minimum_bin_size = 1, invert = F)
 {
   if(invert) methylation_vector <- !methylation_vector
@@ -212,6 +233,7 @@ calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vecto
   l <- length(methylation_vector)
   bin_sizes <- good_bin_sizes(l, max_bins)
   bin_sizes <- bin_sizes[(bin_sizes>minimum_bin_size) | (bin_sizes==1) ]
+  
   
   nas <- is.na(methylation_vector)
   replaced_nas_vector <- methylation_vector
@@ -225,12 +247,14 @@ calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vecto
   remove(replaced_nas_vector, nas)
   if(l>1e7) gc()
   #################################
-
+    
   out <- (sapply(bin_sizes, function(x) 
   { 
     if(verbose) cat(x, "...\n")
     calculate_relevance_and_resolution_ignoring_nas(methylation_vector, cumulative_sum_vector, bin_size = x)
   }))
+  
+  out <- add_max_resolution_point_if_needed(out)
   
   end_time <- Sys.time()
   if(verbose) print(end_time-start_time)
@@ -260,11 +284,45 @@ calculate_relevance_resolution_vector_with_positions <- function(positions, max_
   return(out)
 }
 
-genome_MSR <- function(methylation_positions, minimum_bin_size = 10, verbose = T, invert = F)
+genome_MSR <- function(methylation_positions, minimum_bin_size = 10, verbose = F, invert = F, msr = T, max_bins = 100)
 {
+  if(length(methylation_positions)<2) return(NA)
   v = methylation_positions - min(methylation_positions) + 1
   v = sparseVector(i = v, x = T, length = max(v))
-  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = minimum_bin_size, invert = invert, verbose = verbose)
+  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = minimum_bin_size, invert = invert, verbose = verbose, max_bins = max_bins)
+  if(msr)
+    return(MSR_area(rr))
+  return(rr)
+}
+
+positions_MSR <- function(positions, discretization_bin_size = NA, verbose = F, msr = T, max_bins = 1e6, discrete = F,  max_gbins = 100)
+{
+  if(length(positions)<2) return(NA)
+  positions <- positions[!is.na(positions)]
+  positions <- positions-min(positions)
+  
+  if(is.na(discretization_bin_size))
+  {
+    s <- sort(positions)
+    discretization_bin_size <- min(s[2:length(s)]-s[1:(length(s)-1)])
+  }
+  #print(discretization_bin_size)
+  breaks <- floor(min(max_bins, (max(positions)-min(positions))/discretization_bin_size)*1)
+  #print(breaks)
+  v <- hist(positions, plot = F, breaks = breaks)$counts
+  #print(v)
+  
+  if(discrete)
+  {
+    gc()
+    positions <- sort(positions+1)
+    v <- sparseVector(i = positions, x = T, length = max(positions))
+  }    
+
+  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = 1, verbose = verbose,  max_bins = max_gbins)
+  if(msr)
+    return(MSR_area(rr))
+  cat(MSR_area(rr))
   return(rr)
 }
 
@@ -284,16 +342,23 @@ MSR_area<- function(rr_vector)
 calculate_MSR_area<- function(v)
 {
   rr <- calculate_relevance_resolution_vector_ignoring_nas(v, verbose = F)
-  M <- sum(rr)
-  MSR_area(rr, M)
+  MSR_area(rr)
 }
 
 
 ############################### PLOT FUNCTIONS ###############################
 
-resolution_relevance_plot <- function(relevance_resolution_vector)
+resolution_relevance_plot <- function(relevance_resolution_vector, color = rgb(0, 200, 50, maxColorValue = 255), plotter = plot, area_alpha = 0.5)
 {
-  plot(x = relevance_resolution_vector[2,], y = relevance_resolution_vector[1,], type = "l")
+  ord = order(relevance_resolution_vector[2,])
+  xx = relevance_resolution_vector[2,][ord]
+  yy <- relevance_resolution_vector[1,][ord]
+  max_rel <- max(0.5, max(yy))
+  plotter(x = xx, y = yy, type="o" , lwd=3, xlab = "resolution", ylab = "relevance", ylim = c(0,max_rel), xlim = c(0,1), col = alpha(color, 0.9))
+  polygon( 
+    c(min(xx), xx , max(xx)) , 
+    c( min(yy) , yy , min(yy)) , 
+    col=alpha(color, area_alpha) , border=F)
 }
 
 bin_size_relevance_plot <- function(relevance_resolution_vector)
@@ -465,13 +530,13 @@ suppressMessages(require(Biostrings))
 
 #load("DataCleaning/CpG_sites_dataframe.RData")
 
-nucleotides_pattern_positions <- function(chromosome, pattern, Genome = BSgenome.Mmusculus.UCSC.mm10)
+nucleotides_pattern_positions <- function(chromosome, pattern, Genome = BSgenome.Hsapiens.UCSC.hg38)
 {
   ranges <- matchPattern(pattern,(Genome[[chromosome]]))
   return(IRanges(ranges)@start)
 }
 
-binary_nucleotides_pattern_positions <- function(chromosome, pattern, Genome = BSgenome.Mmusculus.UCSC.mm10)
+binary_nucleotides_pattern_positions <- function(chromosome, pattern, Genome = BSgenome.Hsapiens.UCSC.hg38)
 {
   positions <- IRanges(matchPattern(pattern,(Genome[[chromosome]])))@start
   chromosome_size <- length(Genome[[chromosome]])
@@ -669,7 +734,9 @@ general_msr_cdf <- function(ecdfs, density, msr)
 
 extract_ecdf_function <- function(ecdfs, density)
 {
-  d = msr_confidence_line(msr_ecdf_1e3, density)
+  d = msr_confidence_line(ecdfs, density)
+  d[2] <- 0
+  d[length(d)] <- 0
   approxfun(x = d[1,], y = d[2,])
 }
 
@@ -711,6 +778,87 @@ prop_msr_samples <- function(l, props, sample_size, cores = 1, verbose = F)
   return(msr_samples)
 }
 
+plot_positions <- function(positions)
+{ 
+  positions <- positions-min(positions)
+  plot(x = c(0, 1), y = c(0,0), col = alpha(1, 0.4), ylab = "", xlab = "Positions", type = "l", yaxt='n')
+  points(x = positions/max(positions), y=array(data = 0, dim = length(positions)), pch = "|", ylab = "")
+}
+
+MSR_example <- function(positions, perturb = 0)
+{
+  if(perturb)
+  {
+    s <- sort(positions)
+    sd <- mean(s[2:length(s)]-s[1:(length(s)-1)])*perturb
+    positions <- s + rnorm(length(s), sd = sd)
+  }
+  
+  rr <- positions_MSR(positions, msr = F)
+  msr <- MSR_area(rr)
+  plot_positions(positions - min(positions))
+  resolution_relevance_plot(rr)
+  title(paste("MSR:", round(msr, digits = 3)))
+}
+
+MSR_visualization <- function(positions, discretization_bin_size = NA, perturb = 0)
+{
+  if(perturb)
+  {
+    s <- sort(positions)
+    sd <- mean(s[2:length(s)]-s[1:(length(s)-1)])*perturb
+    positions <- s + rnorm(length(s), sd = sd)
+  }
+    
+  rr <- positions_MSR(positions, discretization_bin_size, F, F, max_bins = 1e6)
+  msr <- MSR_area(rr)
+  resolution_relevance_plot(rr)
+  title(paste("MSR:", round(msr, digits = 4)))
+}
+
+rr_curve_comparison <- function(v_list, legend_names, add_msr = T, discrete = F)
+{
+  rr_list <- lapply(v_list, function(x)
+    {
+    positions_MSR(x, 1, F, F, max_bins = 1e6, discrete = discrete)
+  })
+  
+  
+  msr_list <- sapply(rr_list, MSR_area)
+  
+  if(add_msr)
+    legend_names <- as.character(sapply(1:length(legend_names), function(i){paste(legend_names[i], round(msr_list[i],3), sep = ": ")}))
+  
+  ord <- order(msr_list, decreasing = T)
+  
+  plotter = plot
+  for(i in ord)
+  {
+    resolution_relevance_plot(rr_list[[i]], alpha(i+1, 0.5), plotter, area_alpha = 0.1)
+    plotter = points
+  }
+  
+  legend("topleft", legend=legend_names[ord], col=ord+1, lty = 1, cex = 0.8, y.intersp = 0.5)
+}
+
+filter_by_range <- function(v, min, max)
+{
+  v <- v[v>=min]
+  v[v<=max]
+}
+
+basis_pattern_rr_curve_comparison <- function(patterns, chromosome, min, max, Genome = BSgenome.Hsapiens.UCSC.hg38, same_M = F, discrete = F)
+{
+  v_list <- lapply(patterns, function(p) {
+    x <- nucleotides_pattern_positions(chromosome, p, Genome)
+    if(same_M)
+      return(x[min:max])
+    filter_by_range(x, min, max)
+  })
+  
+  rr_curve_comparison(v_list, legend_names = patterns, discrete = discrete)
+  title(paste(chromosome, "from basis", min, "to", max))
+}
 
 #setwd("./Scrivania/Tesi/MethylationCode/")
 #directory <- "MethylationData/binary_rate/"
@@ -720,3 +868,30 @@ prop_msr_samples <- function(l, props, sample_size, cores = 1, verbose = F)
 #methylation_vector <- as.logical(readRDS("MethylationData/binary_rate/GSM3436261_O1_TA_Hi_10_converted.Rda"))
 
 
+make_random_msr_data_frame <- function(length, samples, lw = 0, hp = 1)
+{
+  p <- runif(samples, lw, hp)
+  msr <- array(dim = samples)
+  for(i in 1:samples)
+  {
+    v <- rbinom(length, 1, p[i])
+    msr[i] <- calculate_MSR_area(v)
+    p[i] <- mean(v)
+  }
+
+  return(data.frame(p=p,msr=msr))
+}
+
+make_random_msr_data_frame2 <- function(samples, lw = 100, hp = 10000, verbose = F)
+{
+  M <- round(runif(samples, lw, hp))
+  msr <- array(dim = samples)
+  for(i in 1:samples)
+  {
+    v <- runif(M[i])
+    msr[i] <- positions_MSR(v, max_gbins = 20)
+    if(verbose) cat(i, "")
+  }
+  
+  return(data.frame(M=M,msr=msr))
+}
