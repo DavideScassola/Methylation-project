@@ -81,15 +81,15 @@ corrected_cumsum <- function(vector)
 }
 
 # PLEASE USE A SPARSE MATRIX IF POSSIBLE
-calculate_relevance_and_resolution_ignoring_nas <- function(methylation_vector, cumulative_sum_vector, bin_size) 
+calculate_relevance_and_resolution_ignoring_nas <- function(cumulative_sum_vector, bin_size) 
 {
-
-  l <- length(methylation_vector)
+  l <- length(cumulative_sum_vector)-1
   #if(bin_size==1) return(c(0,1,1,1))
   #print(bin_size)
   if(bin_size==l) return(c(0,0,l,NA))
   
-  starting_points <- ((1:ceiling(l/bin_size))*bin_size)-bin_size+1
+  #starting_points <- ((1:ceiling(l/bin_size))*bin_size)-bin_size+1
+  starting_points <- seq(from = 1, to = l, by = bin_size)
   counts  <-  cumulative_sum_vector[pmin(starting_points+bin_size, l+1)]-cumulative_sum_vector[starting_points]
   
   if(l/bin_size > 1E8)
@@ -229,35 +229,32 @@ calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vecto
 {
   if(invert) methylation_vector <- !methylation_vector
   
-  start_time <- Sys.time()
+  if(verbose)
+    start_time <- Sys.time()
+  
   l <- length(methylation_vector)
   bin_sizes <- good_bin_sizes(l, max_bins)
   bin_sizes <- bin_sizes[(bin_sizes>minimum_bin_size) | (bin_sizes==1) ]
   
-  
-  nas <- is.na(methylation_vector)
-  replaced_nas_vector <- methylation_vector
-  replaced_nas_vector[nas] <- 0
+  methylation_vector[is.na(methylation_vector)] <- 0
   
   if(verbose) cat("Calculating cumulative sum vector \n")
-  cumulative_sum_vector <- corrected_cumsum(replaced_nas_vector)
+  cumulative_sum_vector <- corrected_cumsum(methylation_vector)
 
   #################################
   # I don't want my RAM to explode
-  remove(replaced_nas_vector, nas)
   if(l>1e7) gc()
   #################################
     
   out <- (sapply(bin_sizes, function(x) 
   { 
     if(verbose) cat(x, "...\n")
-    calculate_relevance_and_resolution_ignoring_nas(methylation_vector, cumulative_sum_vector, bin_size = x)
+    calculate_relevance_and_resolution_ignoring_nas(cumulative_sum_vector, bin_size = x)
   }))
   
   out <- add_max_resolution_point_if_needed(out)
   
-  end_time <- Sys.time()
-  if(verbose) print(end_time-start_time)
+  if(verbose) print(Sys.time()-start_time)
   
   return(out)
 }
@@ -275,7 +272,7 @@ calculate_relevance_resolution_vector_with_positions <- function(positions, max_
   out <- (sapply(bin_sizes, function(x) 
   { 
     if(verbose) cat(x, "...\n")
-    calculate_relevance_and_resolution_ignoring_nas(pre_binned, cumulative_sum_vector, bin_size = x)
+    calculate_relevance_and_resolution_ignoring_nas(cumulative_sum_vector, bin_size = x)
   }))
   
   end_time <- Sys.time()
@@ -288,8 +285,12 @@ genome_MSR <- function(methylation_positions, minimum_bin_size = 10, verbose = F
 {
   if(length(methylation_positions)<2) return(NA)
   v = methylation_positions - min(methylation_positions) + 1
-  v = sparseVector(i = v, x = T, length = max(v))
-  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = minimum_bin_size, invert = invert, verbose = verbose, max_bins = max_bins)
+  l <- max(v)
+  #cat("\n", l)
+  v = sparseVector(i = v, x = T, length = l)
+  bin_size_limit <- ceiling(l/1e5) 
+  #cat("\nbin_size_limit:", bin_size_limit, "max(v):", l, "\n")
+  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = max(minimum_bin_size, bin_size_limit), invert = invert, verbose = verbose, max_bins = max_bins)
   if(msr)
     return(MSR_area(rr))
   return(rr)
@@ -895,3 +896,38 @@ make_random_msr_data_frame2 <- function(samples, lw = 100, hp = 10000, verbose =
   
   return(data.frame(M=M,msr=msr))
 }
+
+
+
+
+# calculate_relevance_and_resolution_ignoring_nas <- function(methylation_vector, cumulative_sum_vector, bin_size) 
+# {
+#   
+#   l <- length(cumulative_sum_vector)-1
+#   #if(bin_size==1) return(c(0,1,1,1))
+#   #print(bin_size)
+#   if(bin_size==l) return(c(0,0,l,NA))
+#   
+#   bin_sizes
+#   starting_points_sparse_matrix <- linspace(1, l, n = ceiling(l/bin_sizes))
+#   counts_sparse_matrix <- 
+#   resolutions <-
+#   relevances <- 
+#     
+#     
+#   starting_points <- ((1:ceiling(l/bin_size))*bin_size)-bin_size+1
+#   counts  <-  cumulative_sum_vector[pmin(starting_points+bin_size, l+1)]-cumulative_sum_vector[starting_points]
+#   
+#   if(l/bin_size > 1E8)
+#   {
+#     # it's useful to save memory, but for large bin size this would just slow down
+#     remove(starting_points)
+#     gc(verbose = F)
+#   }
+#   
+#   M <- cumulative_sum_vector[l+1]
+#   relevance <- calculate_relevance_from_counts(counts, M)
+#   resolution <- calculate_resolution_from_counts(counts, M)
+#   
+#   return(c(relevance, resolution, bin_size, 1))
+# }

@@ -1,0 +1,263 @@
+---
+title: "MSR and expression for ovary genes"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+meth_data_file <- "../../../Rexperiments/ovary_genes_msr_table.Rda"
+rna_file <- "../../../MethylationCode/MethylationData/rna-seq/ENCFF061BJL_ovary_53_total.tsv"
+#filter_gene_type <- c("protein_coding")
+filter_gene_type <- NA
+response_variable <- "log_pme_tpm"
+#response_variable <- "log_tpm"
+epsilon <- 1e-3
+train_prop <- 0.7
+lasso_lambda <- 0.1
+```
+
+```{r, include=FALSE}
+library("PerformanceAnalytics")
+library("MASS")
+library(ggplot2)
+library(ggExtra)
+source("../../../Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
+```
+
+```{r, include=FALSE}
+basic_predictors <- c("log_nucleotides", "CG_density", "log_CG_count", "meth_rate")
+basic_predictors_with_autoc <- c(basic_predictors, "meth_autocorrelation", "drift")
+expression_measures <- c("TPM", "pme_TPM")
+msr_features <- c("CGsites_msr", "meth_msr", "unmeth_msr", "CG_list_msr", "CG_list_inverted_msr")
+all_predictors <- c(basic_predictors_with_autoc, msr_features)
+```
+
+
+```{r, echo=FALSE}
+genes_meth_table = readRDS(meth_data_file)
+genes_meth_table$gene_id <- remove_version_from_gene(genes_meth_table$gene_id)
+rna <- read_rna_file(rna_file, reduced = F, correct_gene_id = T);
+
+data_table <- as.data.frame(merge(genes_meth_table, rna))
+cat("TPM fraction: ", sum(data_table$TPM)/1e6, "\n")
+
+##### filter genes type
+if(!is.na(filter_gene_type))
+{
+  data_table <- data_table[data_table$gene_type %in% filter_gene_type, ]
+  cat(paste(filter_gene_type, "TPM fraction: "), sum(data_table$TPM)/1e6)
+}
+
+
+##### add log(tpm)
+data_table$log_tpm <- log(data_table$TPM + epsilon)
+data_table$log_pme_tpm <- log(data_table$pme_TPM + epsilon)
+data_table$log_fpkm <- log(data_table$FPKM + epsilon)
+data_table$log_pme_fpkm <- log(data_table$pme_FPKM + epsilon)
+#data_table$noisy_log_tpm <- 
+#data_table$noisy_log_pme_tpm <-
+
+#### log transformation
+  data_table$log_nucleotides <- log(data_table$nucleotides, 10)
+  data_table$log_CG_count<- log(data_table$CG_count, 10)
+  #data_table$CG_density<- log(data_table$CG_density, 10)
+```
+
+
+###### Basic features:
+
+```{r, echo=FALSE}
+rows <- sample(1:length(data_table$chr), size = 3e3)
+chart.Correlation(data_table[rows,c(basic_predictors_with_autoc, response_variable)], method = "pearson")
+```
+
+
+###### Comparison with MSR statistics:
+```{r, echo=FALSE}
+chart.Correlation(data_table[rows,c(msr_features, response_variable)])
+```
+
+```{r, echo=FALSE, warning=FALSE}
+ggscatter <- function(data_table, xn, yn, alpha = 0.1)
+{
+df <- data_table[, c(xn, yn)]
+colnames(df) <- c("x","y")
+((ggplot(df,aes(x=x,y=y)) + geom_point(alpha = alpha))) + ylab(yn) + xlab(xn)
+}
+```
+
+meth_autocorrelation vs log(tpm):
+
+```{r, echo=FALSE, warning=FALSE}
+ggscatter(data_table[rows, ], "meth_autocorrelation", response_variable)
+```
+
+CG_list_inverted_msr vs log(tpm):
+
+```{r, echo=FALSE, warning=FALSE}
+ggscatter(data_table[rows, ], "CG_list_inverted_msr", response_variable)
+```
+
+meth_rate_binary vs log(tpm):
+
+```{r, echo=FALSE, warning=FALSE}
+ggscatter(data_table[rows, ], "meth_rate", response_variable)
+```
+
+drift vs log(tpm):
+
+```{r, echo=FALSE, warning=FALSE}
+ggscatter(data_table[rows, ], "drift", response_variable)
+```
+
+
+```{r, echo=FALSE}
+# #### save NA
+#     fragile_features <- c(msr_features)
+#     data_table$valid_msr_measures <- (complete.cases(data_table[,fragile_features]))
+#     data_table[!data_table$valid_msr_measures, fragile_features] <- -1e3
+#     msr_features <- c(msr_features, "valid_msr_measures")
+#     all_predictors <- c(basic_predictors_with_autoc, msr_features)
+#     data_table$valid_msr_measures <- as.factor(data_table$valid_msr_measures)
+    
+    
+# DATASET
+
+model_data = data_table[complete.cases(data_table[,c(all_predictors,expression_measures)]),]
+cat("missing data: ", (1-(length(model_data[,1])/length(data_table[,1])))*100, "%")
+
+# UNDERSAMPLING
+cat("train_data_proportion: ", train_prop)
+random = T
+
+l = length(model_data[,1])
+train_length = train_prop*l
+
+if(random) 
+{
+  train_rows = sample(1:l, size = train_length, replace = F)
+} else train_rows = 1:train_length
+
+test_rows = (1:l)[-train_rows]
+
+train_model_data = model_data[train_rows,]
+test_model_data = model_data[test_rows,]
+
+
+
+# DATASET
+
+model_data_basic = data_table[complete.cases(data_table[,c(basic_predictors_with_autoc,expression_measures)]),]
+cat("\n\nbasic missing data: ", (1-(length(model_data_basic[,1])/length(model_data_basic[,1])))*100, "%")
+
+# UNDERSAMPLING
+cat("train_data_proportion: ", train_prop)
+random = T
+
+l = length(model_data_basic[,1])
+train_length = train_prop*l
+
+if(random) 
+{
+  train_rows = sample(1:l, size = train_length, replace = F)
+} else train_rows = 1:train_length
+
+test_rows = (1:l)[-train_rows]
+
+basic_train_model_data = model_data_basic[train_rows,]
+basic_test_model_data = model_data_basic[test_rows,]
+
+
+```
+
+
+```{r, echo=FALSE}
+check_model <- function(train_model_data, test_model_data, response_variable, predictors, summary = T)
+{
+  formula <- as.formula(paste(response_variable, "~ ."))
+  model = lm(formula, data = train_model_data[, c(response_variable, predictors)])
+  if(summary)
+    print(summary(model))
+  else
+  {
+    cat("predictors: ", predictors, "\n")
+  }
+  cat("Test data R squared: ", tmse(model, test_model_data, response_variable))
+  #1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )
+}
+```
+
+Linear model for log_tpm with basic features:
+```{r, echo=FALSE}
+check_model(train_model_data, test_model_data, response_variable, basic_predictors)
+
+cat("\nkeeping also data with NA msr features: ")
+check_model(basic_train_model_data, basic_test_model_data, response_variable, basic_predictors, summary = F)
+```
+
+
+Linear model for log_tpm with basic features with meth_autocorrelation and drift:
+```{r, echo=FALSE}
+check_model(train_model_data, test_model_data, response_variable, basic_predictors_with_autoc)
+
+cat("\nkeeping also data with NA msr features: ")
+check_model(basic_train_model_data, basic_test_model_data, response_variable, basic_predictors_with_autoc, summary = F)
+```
+
+Linear model for TPM with all predictors:
+```{r, echo=FALSE}
+check_model(train_model_data, test_model_data, response_variable, all_predictors)
+```
+
+Lasso:
+```{r, echo=FALSE}
+model <- lasso(response_variable, df = train_model_data[,c(response_variable, all_predictors)], lambda = lasso_lambda)
+
+cat("lambda:", model$lambda, "\n")
+# print(model$beta)
+cat("\nTest data R squared: ", tmse.glmnet(model, test_model_data, response_variable, all_predictors ))
+```
+
+Normalized lasso coefficient:
+```{r, echo=FALSE}
+ss <- scale(as.matrix.data.frame(train_model_data[, c(all_predictors)]))
+s <- attr(ss, 'scaled:scale')
+model$beta[,1] <- s*model$beta[,1]
+print(model$beta)
+```
+
+Random Forest
+
+```{r, echo=FALSE}
+suppressMessages(library(randomForest))
+predictors <- basic_predictors_with_autoc
+variables <- c(response_variable, predictors)
+model <- randomForest(model_this(response_variable), basic_train_model_data[,variables], importance = T, ntree = 100)
+
+cat("predictors: ", predictors)
+cat("\n test rsq: ", tmse(model, basic_test_model_data[,variables], y_name = response_variable))
+```
+
+```{r, echo=FALSE}
+plot(model$rsq, type = "l", xlab = "number of trees", ylab = "rsq")
+```
+
+Importance
+
+```{r, echo=FALSE}
+print(model$importance)
+```
+
+Performance
+
+```{r, echo=FALSE}
+test_data <- basic_test_model_data
+rows <- sample(1:length(basic_test_model_data[,1]),2000)
+test_data <- test_data[rows, ]
+y_true <- test_data[, response_variable]
+y_pred <- predict(model, test_data, type = "response")
+plot(y_pred, y_true, col = alpha(1,0.5), main = paste("pearson corr:", round(cor(y_true, y_pred),3)))
+```

@@ -9,7 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, include=FALSE}
 meth_data_file <- "../../../Rexperiments/lung_30_female_genes_msr_table.Rda"
-rna_file <- "../../../MethylationCode/MethylationData/rna-seq/ENCFF947WLV_lung_30_gene_quantifications.tsv"
+rna_file <- "../../../MethylationCode/MethylationData/rna-seq/ENCFF947WLV_lung_30_polyA.tsv"
 filter_gene_type <- c("protein_coding")
 #filter_gene_type <- NA
 response_variable <- "log_pme_tpm"
@@ -55,6 +55,8 @@ if(!is.na(filter_gene_type))
 ##### add log(tpm)
 data_table$log_tpm <- log(data_table$TPM + epsilon)
 data_table$log_pme_tpm <- log(data_table$pme_TPM + epsilon)
+data_table$log_fpkm <- log(data_table$FPKM + epsilon)
+data_table$log_pme_fpkm <- log(data_table$pme_FPKM + epsilon)
 #data_table$noisy_log_tpm <- 
 #data_table$noisy_log_pme_tpm <-
 
@@ -79,30 +81,34 @@ chart.Correlation(data_table[rows,c(msr_features, response_variable)])
 ```
 
 ```{r, echo=FALSE, warning=FALSE}
-ggscatter <- function(data_table, xn, response_variable, alpha = 0.1)
+ggscatter <- function(data_table, xn, yn, alpha = 0.1)
 {
-df <- data_table[, c(xn, response_variable)]
+df <- data_table[, c(xn, yn)]
 colnames(df) <- c("x","y")
-((ggplot(df,aes(x=x,y=y)) + geom_point(alpha = alpha))) + ylab(response_variable) + xlab(xn)
+((ggplot(df,aes(x=x,y=y)) + geom_point(alpha = alpha))) + ylab(yn) + xlab(xn)
 }
 ```
 
 meth_autocorrelation vs log(tpm):
+
 ```{r, echo=FALSE, warning=FALSE}
 ggscatter(data_table[rows, ], "meth_autocorrelation", response_variable)
 ```
 
 CG_list_inverted_msr vs log(tpm):
+
 ```{r, echo=FALSE, warning=FALSE}
 ggscatter(data_table[rows, ], "CG_list_inverted_msr", response_variable)
 ```
 
 meth_rate_binary vs log(tpm):
+
 ```{r, echo=FALSE, warning=FALSE}
 ggscatter(data_table[rows, ], "meth_rate", response_variable)
 ```
 
 drift vs log(tpm):
+
 ```{r, echo=FALSE, warning=FALSE}
 ggscatter(data_table[rows, ], "drift", response_variable)
 ```
@@ -124,7 +130,7 @@ model_data = data_table[complete.cases(data_table[,c(all_predictors,expression_m
 cat("missing data: ", (1-(length(model_data[,1])/length(data_table[,1])))*100, "%")
 
 # UNDERSAMPLING
-cat("\ntrain_data_proportion: ", train_prop)
+cat("train_data_proportion: ", train_prop)
 random = T
 
 l = length(model_data[,1])
@@ -148,10 +154,10 @@ model_data_basic = data_table[complete.cases(data_table[,c(basic_predictors_with
 cat("\n\nbasic missing data: ", (1-(length(model_data_basic[,1])/length(model_data_basic[,1])))*100, "%")
 
 # UNDERSAMPLING
-cat("\ntrain_data_proportion: ", train_prop)
+cat("train_data_proportion: ", train_prop)
 random = T
 
-l = length(model_data[,1])
+l = length(model_data_basic[,1])
 train_length = train_prop*l
 
 if(random) 
@@ -175,6 +181,10 @@ check_model <- function(train_model_data, test_model_data, response_variable, pr
   model = lm(formula, data = train_model_data[, c(response_variable, predictors)])
   if(summary)
     print(summary(model))
+  else
+  {
+    cat("predictors: ", predictors, "\n")
+  }
   cat("Test data R squared: ", tmse(model, test_model_data, response_variable))
   #1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )
 }
@@ -184,7 +194,7 @@ Linear model for log_tpm with basic features:
 ```{r, echo=FALSE}
 check_model(train_model_data, test_model_data, response_variable, basic_predictors)
 
-cat("\n\nkeeping also data with NA msr features:\n")
+cat("\nkeeping also data with NA msr features: ")
 check_model(basic_train_model_data, basic_test_model_data, response_variable, basic_predictors, summary = F)
 ```
 
@@ -193,7 +203,7 @@ Linear model for log_tpm with basic features with meth_autocorrelation and drift
 ```{r, echo=FALSE}
 check_model(train_model_data, test_model_data, response_variable, basic_predictors_with_autoc)
 
-cat("\n\nkeeping also data with NA msr features:\n")
+cat("\nkeeping also data with NA msr features: ")
 check_model(basic_train_model_data, basic_test_model_data, response_variable, basic_predictors_with_autoc, summary = F)
 ```
 
@@ -202,22 +212,52 @@ Linear model for TPM with all predictors:
 check_model(train_model_data, test_model_data, response_variable, all_predictors)
 ```
 
-Linear model with few predictors
-```{r, echo=FALSE}
-check_model(train_model_data, test_model_data, response_variable, c("meth_autocorrelation", "drift","nucleotides"))
-```
-
 Lasso:
 ```{r, echo=FALSE}
 model <- lasso(response_variable, df = train_model_data[,c(response_variable, all_predictors)], lambda = lasso_lambda)
 
 cat("lambda:", model$lambda, "\n")
-print(model$beta)
+# print(model$beta)
 cat("\nTest data R squared: ", tmse.glmnet(model, test_model_data, response_variable, all_predictors ))
 ```
 
+Normalized lasso coefficient:
+```{r, echo=FALSE}
+ss <- scale(as.matrix.data.frame(train_model_data[, c(all_predictors)]))
+s <- attr(ss, 'scaled:scale')
+model$beta[,1] <- s*model$beta[,1]
+print(model$beta)
+```
+
+Random Forest
 
 ```{r, echo=FALSE}
-#library(randomForest)
-# model <- randomForest(model_this(response_variable), train_model_data[,c(response_variable, all_predictors)], importance = T)
+suppressMessages(library(randomForest))
+predictors <- basic_predictors_with_autoc
+variables <- c(response_variable, predictors)
+model <- randomForest(model_this(response_variable), basic_train_model_data[,variables], importance = T, ntree = 100)
+
+cat("predictors: ", predictors)
+cat("\n test rsq: ", tmse(model, basic_test_model_data[,variables], y_name = response_variable))
+```
+
+```{r, echo=FALSE}
+plot(model$rsq, type = "l", xlab = "number of trees", ylab = "rsq")
+```
+
+Importance
+
+```{r, echo=FALSE}
+print(model$importance)
+```
+
+Performance
+
+```{r, echo=FALSE}
+test_data <- basic_test_model_data
+rows <- sample(1:length(basic_test_model_data[,1]),2000)
+test_data <- test_data[rows, ]
+y_true <- test_data[, response_variable]
+y_pred <- predict(model, test_data, type = "response")
+plot(y_pred, y_true, col = alpha(1,0.5), main = paste("pearson corr:", round(cor(y_true, y_pred),3)))
 ```

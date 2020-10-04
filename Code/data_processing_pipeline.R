@@ -7,9 +7,9 @@ source("WGBS_analysis_functions.R", chdir = T)
 # msr_ecdf_1e6 = readRDS("../../MethylationCode/MethylationData/msr_ecdf_1e6.Rda")
 
 # fragmets_msr_table
-wgbs_file <- "../../MethylationCode/MethylationData/wgbs/"
-new_name  <- "../../MethylationCode/MethylationData/wgbs/ENCFF752NXS_GM23248.rda" # could automate
-short_name <- "GM23248"
+wgbs_file <- "../../MethylationCode/MethylationData/wgbs/stomach.Rda"
+new_name  <- "../../MethylationCode/MethylationData/wgbs/ENCFF752NXS_GM23248.rda"
+short_name <- "stomach"
 msr_ecdf_file <- "../../MethylationCode/MethylationData/msr_ecdf_1e3.Rda"
 size <- 1e3
 produce_and_save_fragments_msr_table(wgbs_file, short_name, size, msr_ecdf_file, na_tolerance = 0.4, minimum_reads=1, methylation_assigner = standard_binaryzer, bed = NA, dir = "../../Rexperiments/")
@@ -46,8 +46,8 @@ rna_table = readRDS("../../Rexperiments/stomach_rna_table_1000_extended.Rda")
 
 ########
 # genes table
-short_name <- "lung_30_female"
-wgbs_file  <- "../../MethylationCode/MethylationData/wgbs/ENCFF039JFT_lung_30_female.rda"
+short_name <- "ovary"
+wgbs_file  <- "../../MethylationCode/MethylationData/wgbs/ENCFF303ZGP_ovary_53_female.rda"
 genebody_annotation_file <- "../../Rexperiments/detailed_genebody_improved.Rda"
 produce_and_save_genes_msr_table(wgbs_file, short_name, genebody_annotation_file, gene_type_filter = NA, na_tolerance = 0.3, no_msr = F, dir = "../../Rexperiments/")
   
