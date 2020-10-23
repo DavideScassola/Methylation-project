@@ -1,0 +1,306 @@
+---
+title: "MSR and expression for stomach, windows of 1000 sites, extended genes set"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, include=FALSE}
+library("PerformanceAnalytics")
+library("MASS")
+setwd(dir = "../../../")
+source("Methylation-project/Code/WGBS_analysis_functions.R", chdir = T)
+
+
+##########################
+genebody = readRDS("Rexperiments/genebody_improved.Rda")
+##########################
+
+response_variable <- "log_total_pme_TPM" 
+y <- c("gene_count", response_variable)
+basic_predictors <- c("log_nucleotides", "CpG_density", "meth_rate", "msr_density")
+basic_predictors_with_autoc <- c(basic_predictors, "meth_autocorrelation", "drift", "meth_sd")
+essentials <- c(y, basic_predictors)
+essential_msr_predictors <- c("msr", "inverted_msr")
+fancy_msr_predictors <- c("ecdf", "inverted_ecdf", "residual", "inverted_residual")
+msr_predictors <- c(essential_msr_predictors, fancy_msr_predictors)
+all_predictors <- c(msr_predictors, basic_predictors_with_autoc)
+
+```
+
+
+```{r, include=FALSE}
+msr_fragments_table = readRDS("../../../Rexperiments/final/stomach_msr_table_1000.Rda")
+rna_fragment_table = readRDS("../../../Rexperiments/final/stomach_expression_table_1000_total.Rda")
+#########################
+```
+
+
+
+The DataFrame is the following (excluding some columns for readability):
+```{r, echo=FALSE}
+data_table <- join_rna_and_msr_table(rna_fragment_table, msr_fragments_table)
+epsilon <- 1e-3
+data_table <- add_log_features(data_table, c("nucleotides", "total_TPM", "total_FPKM", "total_pme_TPM", "total_pme_FPKM"), epsilon)
+
+colnames(data_table)[1] <- "chr"
+data_table <- exclude_sex_chromosomes(data_table)
+#data_table <- data_table[data_table$gene_count>0, ]
+#tpm_noise <- rexp(length(data_table$log_tpm), rate = 1e3)
+#log_tpm_noise <- rnorm(length(data_table$log_tpm), sd = 0.5)
+#log_tpm_noise[data_table$total_TPM>0] <- 0
+
+#data_table$log_tpm <- data_table$log_tpm + log_tpm_noise
+
+data_table <- exclude_outliers(data_table, lim = 2.5e5)
+#data_table$log_tpm[data_table$gene_count==0] = NA
+#data_table <- exclude_outliers(data_table, lim = 2e6)
+```
+
+
+###### Basic features:
+
+```{r, echo=FALSE}
+rows <- sample(1:length(data_table[,1]), size = 4e3)
+chart.Correlation(data_table[rows,c(y,basic_predictors_with_autoc)])
+```
+
+
+###### Comparison with simple MSR statistics:
+```{r, echo=FALSE}
+chart.Correlation(data_table[rows,c(essentials, essential_msr_predictors)])
+```
+
+######Comparison with other MSR statistics:
+```{r, echo=FALSE}
+chart.Correlation(data_table[rows,c(y, fancy_msr_predictors, "meth_autocorrelation")])
+```
+
+```{r, echo=FALSE, warning=FALSE}
+#mi.plot(data_table[,c(essentials, essential_msr_predictors)])
+```
+
+inverted msr vs log(tpm):
+```{r, echo=FALSE, warning=FALSE}
+library(ggplot2)
+library(ggExtra)
+#plot(data_table$inverted_msr, data_table$log_tpm, pch = )
+#ggplot(data_table,aes(x=inverted_msr,y=log_tpm)) + stat_binhex(bins = 20) + scale_fill_viridis_c() + geom_point(shape = '.', col = 'white')
+
+((ggplot(data_table[rows, ],aes(x=inverted_msr,y=log_tpm)) + geom_point(alpha = 0.1))) + ylab("log (TPM)")
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+((ggplot(data_table[rows, ],aes(x=meth_autocorrelation,y=log_tpm)) + geom_point(alpha = 0.1)))+ ylab("log (TPM)")
+```
+
+```{r, echo=FALSE, warning=FALSE}
+((ggplot(data_table[rows, ],aes(x=msr_density,y=log_tpm)) + geom_point(alpha = 0.1)))+ ylab("log (TPM)")+ xlab("methylation rate")
+```
+
+```{r, echo=FALSE, warning=FALSE}
+((ggplot(data_table[rows, ],aes(x=residual,y=log_tpm)) + geom_point(alpha = 0.1)))+ ylab("log (TPM)")
+```
+
+```{r, echo=FALSE}
+# DATASET
+
+model_data = data_table[complete.cases(data_table[,c(basic_predictors,msr_predictors)]),]
+cat("missing data: ", (1-(length(model_data[,1])/length(data_table[,1])))*100, "%")
+
+# UNDERSAMPLING
+train_prop = 0.7; cat("\ntrain_data_proportion: ", train_prop)
+random = T
+
+l = length(model_data[,1])
+train_length = train_prop*l
+
+if(random) 
+{
+  train_rows = sample(1:l, size = train_length, replace = F)
+} else train_rows = 1:train_length
+
+test_rows = (1:l)[-train_rows]
+
+train_model_data = model_data[train_rows,]
+test_model_data = model_data[test_rows,]
+```
+
+
+```{r, echo=FALSE}
+gene_mask = data_table$gene_count>0
+feature = feature = data_table$meth_autocorrelation
+feature_name = "meth_sd"
+
+binary_predictivity_hist(feature,
+                         mask = gene_mask,
+                         xlab = feature_name, sep_names = c("one or more genes", "no genes"),
+                         colors = c(5,7), breaks = 15,
+                         main = sprintf("Can %s predict the presence of a gene?", feature_name),
+                         max_y = 8)
+
+```
+
+The fraction of fragments that have at least one gene inside is (train data)
+```{r, echo=FALSE}
+mean(train_model_data$gene_count>0, na.rm=T)
+```
+
+Logistic Regression Model for gene presence with basic predictors (nucleotides, CpG_density, meth rate, msr_density):
+```{r, echo=FALSE}
+
+# Logistics Regression
+glm.fit <- glm(train_model_data$gene_count>0 ~ nucleotides+CpG_density+meth_rate+ msr_density , data = train_model_data, family = binomial)
+
+
+#summary(glm.fit)
+cat("TRAIN DATA ")
+nd <- train_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$gene_count>0
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2], "\n\n")
+
+cat("TEST DATA ")
+nd <- test_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$gene_count>0
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
+```
+
+Logistic Regression Model for gene presence with basic predictors (nucleotides, CpG_density, meth rate, msr_density):
+```{r, echo=FALSE}
+
+# Logistics Regression
+glm.fit <- glm(train_model_data$gene_count>0 ~ nucleotides+CpG_density+meth_rate+ msr_density + meth_autocorrelation + residual + drift + meth_sd , data = train_model_data, family = binomial)
+
+
+#summary(glm.fit)
+cat("TRAIN DATA ")
+nd <- train_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$gene_count>0
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2], "\n\n")
+
+cat("TEST DATA ")
+nd <- test_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$gene_count>0
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
+```
+
+Logistic Regression Model for gene presence with basic predictors (nucleotides, CpG_density, meth rate, msr_density):
+```{r, echo=FALSE}
+
+# Logistics Regression
+glm.fit <- randomForest(as.factor(train_model_data$gene_count>0) ~ nucleotides+CpG_density+meth_rate+ msr_density + meth_autocorrelation + residual + drift + meth_sd , data = train_model_data, ntrees = 100)
+
+
+#summary(glm.fit)
+cat("TRAIN DATA ")
+nd <- train_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$gene_count>0
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2], "\n\n")
+
+cat("TEST DATA ")
+nd <- test_model_data
+probabilities = predict(glm.fit, newdata = nd, type="response")
+prediction = probabilities>0.5
+actual = nd$gene_count>0
+t = table(actual, prediction)
+#prop.table(t)
+
+cat("accuracy: ", prop.table(t)[1,1]+prop.table(t)[2,2])
+```
+
+Linear model for TPM with basic features but no information about genes:
+```{r, echo=FALSE}
+predictors = c(basic_predictors)
+check_linear_model(train_model_data, test_model_data, response_variable, predictors, summary = F)
+```
+
+
+Linear model for TPM with basic features but no information about genes:
+```{r, echo=FALSE}
+predictors = c(basic_predictors_with_autoc)
+check_linear_model(train_model_data, test_model_data, response_variable, predictors, summary = F)
+```
+
+
+Linear model for TPM with all features but no information about genes:
+```{r, echo=FALSE}
+predictors = c(all_predictors)
+check_linear_model(train_model_data, test_model_data, response_variable, predictors, summary = F)
+```
+
+Linear model for TPM with inverted msr but no information about genes:
+```{r, echo=FALSE}
+predictors = c(basic_predictors, "inverted_msr")
+check_linear_model(train_model_data, test_model_data, response_variable, predictors, summary = F)
+```
+
+
+Normalized lasso coefficient:
+```{r, echo=FALSE}
+ss <- scale(as.matrix.data.frame(train_model_data[, c(all_predictors)]))
+s <- attr(ss, 'scaled:scale')
+model$beta[,1] <- s*model$beta[,1]
+print(model$beta)
+```
+
+Random Forest
+
+```{r, echo=FALSE}
+suppressMessages(library(randomForest))
+predictors <- all_predictors
+variables <- c(response_variable, predictors)
+model <- randomForest(model_this(response_variable), train_model_data[,variables], importance = T, ntree = 200)
+
+cat("predictors: ", predictors)
+cat("\n test rsq: ", tmse(model, test_model_data[,variables], y_name = response_variable))
+```
+
+```{r, echo=FALSE}
+plot(model$rsq, type = "l", xlab = "number of trees", ylab = "rsq")
+```
+
+Importance
+
+```{r, echo=FALSE}
+print(model$importance)
+```
+
+Performance
+
+```{r, echo=FALSE}
+test_data <- test_model_data
+rows <- sample(1:length(test_model_data[,1]),2000)
+test_data <- test_data[rows, ]
+y_true <- test_data[, response_variable]
+y_pred <- predict(model, test_data, type = "response")
+plot(y_true, y_pred, col = alpha(1,0.5), main = paste("pearson corr:", round(cor(y_true, y_pred),3)))
+```

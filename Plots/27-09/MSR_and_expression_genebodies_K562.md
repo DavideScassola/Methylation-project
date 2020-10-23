@@ -47,30 +47,30 @@ Linear model for log\_tpm with basic features:
     ##     predictors)])
     ## 
     ## Residuals:
-    ##    Min     1Q Median     3Q    Max 
-    ## -8.845 -1.365 -0.037  1.275 12.175 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -8.6229 -1.3588 -0.0148  1.2924 12.0724 
     ## 
     ## Coefficients:
     ##                  Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)      -0.59589    0.55171  -1.080   0.2801    
-    ## log_nucleotides   0.67058    0.24947   2.688   0.0072 ** 
-    ## CG_density      -44.76202    4.71025  -9.503  < 2e-16 ***
-    ## log_CG_count     -1.47430    0.26431  -5.578  2.5e-08 ***
-    ## meth_rate         5.36440    0.09369  57.257  < 2e-16 ***
+    ## (Intercept)      -0.45919    0.53357  -0.861   0.3895    
+    ## log_nucleotides   0.55658    0.24189   2.301   0.0214 *  
+    ## CG_density      -45.06141    4.46319 -10.096  < 2e-16 ***
+    ## log_CG_count     -1.30630    0.25659  -5.091 3.63e-07 ***
+    ## meth_rate         5.28567    0.09211  57.383  < 2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 2.339 on 9658 degrees of freedom
-    ## Multiple R-squared:  0.3039, Adjusted R-squared:  0.3036 
-    ## F-statistic:  1054 on 4 and 9658 DF,  p-value: < 2.2e-16
+    ## Residual standard error: 2.311 on 9658 degrees of freedom
+    ## Multiple R-squared:  0.3035, Adjusted R-squared:  0.3032 
+    ## F-statistic:  1052 on 4 and 9658 DF,  p-value: < 2.2e-16
     ## 
-    ## Test data R squared:  0.2962737
+    ## Test data R squared:  0.2974893
 
     ## 
     ## keeping also data with NA msr features:
 
     ## predictors:  log_nucleotides CG_density log_CG_count meth_rate 
-    ## Test data R squared:  0.246589
+    ## Test data R squared:  0.2586815
 
 Linear model for log\_tpm with basic features with meth\_autocorrelation and drift:
 
@@ -81,31 +81,31 @@ Linear model for log\_tpm with basic features with meth\_autocorrelation and dri
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -9.2260 -1.2244 -0.0382  1.1952 12.5562 
+    ## -7.8194 -1.2055 -0.0306  1.2008 10.7406 
     ## 
     ## Coefficients:
     ##                       Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)           -8.10857    0.55626 -14.577  < 2e-16 ***
-    ## log_nucleotides        2.49961    0.22929  10.902  < 2e-16 ***
-    ## CG_density           -27.77077    4.24659  -6.540 6.48e-11 ***
-    ## log_CG_count          -3.17896    0.24077 -13.203  < 2e-16 ***
-    ## meth_rate              4.73381    0.09434  50.179  < 2e-16 ***
-    ## meth_autocorrelation   5.96674    0.16347  36.501  < 2e-16 ***
-    ## drift                 -4.62566    0.46685  -9.908  < 2e-16 ***
+    ## (Intercept)           -8.51864    0.54294 -15.690  < 2e-16 ***
+    ## log_nucleotides        2.56711    0.22284  11.520  < 2e-16 ***
+    ## CG_density           -24.77834    4.02939  -6.149 8.09e-10 ***
+    ## log_CG_count          -3.17575    0.23401 -13.571  < 2e-16 ***
+    ## meth_rate              4.60163    0.09261  49.688  < 2e-16 ***
+    ## meth_autocorrelation   6.08477    0.16285  37.365  < 2e-16 ***
+    ## drift                 -4.17726    0.45930  -9.095  < 2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 2.089 on 9656 degrees of freedom
-    ## Multiple R-squared:  0.4447, Adjusted R-squared:  0.4444 
-    ## F-statistic:  1289 on 6 and 9656 DF,  p-value: < 2.2e-16
+    ## Residual standard error: 2.062 on 9656 degrees of freedom
+    ## Multiple R-squared:  0.4455, Adjusted R-squared:  0.4452 
+    ## F-statistic:  1293 on 6 and 9656 DF,  p-value: < 2.2e-16
     ## 
-    ## Test data R squared:  0.4371575
+    ## Test data R squared:  0.4368803
 
     ## 
     ## keeping also data with NA msr features:
 
     ## predictors:  log_nucleotides CG_density log_CG_count meth_rate meth_autocorrelation drift 
-    ## Test data R squared:  0.384843
+    ## Test data R squared:  0.39393
 
 Linear model for TPM with all predictors:
 
@@ -116,52 +116,52 @@ Linear model for TPM with all predictors:
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -9.1854 -1.2013 -0.0059  1.1591 12.8382 
+    ## -9.2383 -1.1731 -0.0234  1.1538 10.7292 
     ## 
     ## Coefficients:
     ##                      Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)           -8.3312     1.4525  -5.736 1.00e-08 ***
-    ## log_nucleotides        2.2828     0.2321   9.834  < 2e-16 ***
-    ## CG_density           -30.4525     4.3224  -7.045 1.98e-12 ***
-    ## log_CG_count          -2.4721     0.2435 -10.151  < 2e-16 ***
-    ## meth_rate              2.5210     0.2828   8.914  < 2e-16 ***
-    ## meth_autocorrelation   4.0323     0.2053  19.638  < 2e-16 ***
-    ## drift                  3.4165     0.7418   4.606 4.16e-06 ***
-    ## CGsites_msr            6.6071     3.9954   1.654 0.098220 .  
-    ## meth_msr              11.6754     1.1475  10.175  < 2e-16 ***
-    ## unmeth_msr            -2.6453     2.1196  -1.248 0.212052    
-    ## CG_list_msr          -14.9476     1.0867 -13.755  < 2e-16 ***
-    ## CG_list_inverted_msr  -3.3904     0.9129  -3.714 0.000205 ***
+    ## (Intercept)           -7.4402     1.4415  -5.162 2.50e-07 ***
+    ## log_nucleotides        2.3321     0.2253  10.351  < 2e-16 ***
+    ## CG_density           -27.9728     4.0951  -6.831 8.95e-12 ***
+    ## log_CG_count          -2.4532     0.2360 -10.397  < 2e-16 ***
+    ## meth_rate              2.3998     0.2863   8.384  < 2e-16 ***
+    ## meth_autocorrelation   4.0787     0.2050  19.897  < 2e-16 ***
+    ## drift                  4.7125     0.7215   6.532 6.83e-11 ***
+    ## CGsites_msr            3.1503     3.9638   0.795    0.427    
+    ## meth_msr              11.8057     1.1789  10.015  < 2e-16 ***
+    ## unmeth_msr            -2.9701     2.1736  -1.366    0.172    
+    ## CG_list_msr          -15.5327     1.1122 -13.966  < 2e-16 ***
+    ## CG_list_inverted_msr  -4.1499     0.9002  -4.610 4.07e-06 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 2.056 on 9651 degrees of freedom
-    ## Multiple R-squared:  0.4625, Adjusted R-squared:  0.4619 
-    ## F-statistic: 755.1 on 11 and 9651 DF,  p-value: < 2.2e-16
+    ## Residual standard error: 2.025 on 9651 degrees of freedom
+    ## Multiple R-squared:  0.4656, Adjusted R-squared:  0.465 
+    ## F-statistic: 764.4 on 11 and 9651 DF,  p-value: < 2.2e-16
     ## 
-    ## Test data R squared:  0.4552212
+    ## Test data R squared:  0.4512016
 
 Lasso:
 
     ## lambda: 0.1
 
     ## 
-    ## Test data R squared:  0.4454737
+    ## Test data R squared:  0.4394296
 
 Normalized lasso coefficient:
 
     ## 11 x 1 sparse Matrix of class "dgCMatrix"
     ##                              s0
     ## log_nucleotides       .        
-    ## CG_density           -0.7686417
+    ## CG_density           -0.7557909
     ## log_CG_count          .        
-    ## meth_rate             0.5328008
-    ## meth_autocorrelation  0.6036090
+    ## meth_rate             0.5303542
+    ## meth_autocorrelation  0.6124922
     ## drift                 .        
     ## CGsites_msr           .        
-    ## meth_msr              0.2190297
+    ## meth_msr              0.1983267
     ## unmeth_msr            .        
-    ## CG_list_msr          -0.8531962
+    ## CG_list_msr          -0.8322120
     ## CG_list_inverted_msr  .
 
 Random Forest
@@ -169,20 +169,73 @@ Random Forest
     ## predictors:  log_nucleotides CG_density log_CG_count meth_rate meth_autocorrelation drift
 
     ## 
-    ##  test rsq:  0.5624047
+    ##  test rsq:  0.5685
 
 ![](MSR_and_expression_genebodies_K562_files/figure-markdown_github/unnamed-chunk-20-1.png)
 
 Importance
 
     ##                       %IncMSE IncNodePurity
-    ## log_nucleotides      2.327472     10706.267
-    ## CG_density           2.627016     14618.076
-    ## log_CG_count         1.564238      8808.443
-    ## meth_rate            6.036035     23141.625
-    ## meth_autocorrelation 3.418777     20028.134
-    ## drift                2.675451     15219.713
+    ## log_nucleotides      2.404497     10853.899
+    ## CG_density           2.446640     14702.240
+    ## log_CG_count         1.509005      8618.408
+    ## meth_rate            6.115503     22868.303
+    ## meth_autocorrelation 3.407353     20911.385
+    ## drift                2.517950     14498.656
 
 Performance
 
 ![](MSR_and_expression_genebodies_K562_files/figure-markdown_github/unnamed-chunk-22-1.png)
+
+Interpretation
+
+    ## Double reads proportion:  0.9316094
+    ## Hemimethylation proportion on double reads:  0.01575834
+
+Regions with high predicted expression and low error
+
+    ## -4.600312e-05
+
+    ## 0.323871
+
+    ## 0.4454601
+
+![](MSR_and_expression_genebodies_K562_files/figure-markdown_github/unnamed-chunk-24-1.png)
+
+    ## 0.8219401
+
+regions with low predicted expression and low error
+
+    ## -0.8992155
+
+    ## -0.9444062
+
+    ## -0.9473352
+
+![](MSR_and_expression_genebodies_K562_files/figure-markdown_github/unnamed-chunk-25-1.png)
+
+    ## -0.982586
+
+Regions with true expression &gt;&gt; predicted
+
+    ## 10.73996
+
+    ## 9.400097
+
+    ## 8.833727
+
+![](MSR_and_expression_genebodies_K562_files/figure-markdown_github/unnamed-chunk-26-1.png)
+
+    ## 8.798096
+
+Regions with true expression &lt;&lt; predicted
+
+    ## -9.217347
+
+    ## -8.416477
+
+    ## -8.205722
+
+![](MSR_and_expression_genebodies_K562_files/figure-markdown_github/unnamed-chunk-27-1.png)
+
+    ## -7.365206

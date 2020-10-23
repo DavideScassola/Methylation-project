@@ -1,0 +1,384 @@
+---
+title: "multiple_regressions"
+author: "Davide Scassola"
+date: "25 agosto 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, include=FALSE}
+library(ggfortify)
+library(randomForest)
+library(xgboost)
+library("PerformanceAnalytics")
+source("WGBS_analysis_functions.R", chdir = T)
+```
+
+```{r, include=FALSE}
+single_correlations_matrix <- function(data, response_variable, predictors)
+{
+  m <- sapply(data_tables, function(dt) {single_correlations(dt, response_variable, predictors)})
+  rownames(m) <- predictors
+  m
+}
+
+self_test <- function(models_and_test, eval_method = tmse)
+{
+  sapply(models_and_test, function(mt){eval_method(mt$model, mt$test)})
+}
+
+cross_matrix_test <- function(models_and_test, eval_method = tmse)
+{
+  sapply(models_and_test, function(mt1){
+    sapply(models_and_test, function(mt2) {eval_method(mt2$model, mt1$test)})})
+}
+
+merge_model_datas <- function(model_datas)
+{
+  final_data = model_datas[[1]]
+  final_data$name <- "total"
+  for(i in 2:length(model_datas))
+    for(j in 1:(length(final_data)-1))
+      final_data[[j]] <- rbind(final_data[[j]], (model_datas[[i]])[[j]])
+    
+  final_data
+}
+
+test_full_model_on_cells <- function(model, test, eval_method = tmse)
+{
+  cells_factors <- as.factor(levels(test$cell_name))
+  v <- sapply(cells_factors, function(cell){eval_method(model, test[test$cell_name==cell, ])})
+  names(v) <- levels(test$cell_name)
+  v
+}
+
+r2 <- function(a,b) {prediction_correlation_score(a,b)^2}
+
+```
+
+```{r, include=FALSE}
+fragments_experiment <- T
+```
+
+```{r, include=FALSE}
+# general paramenters
+train_prop <- 0.7
+random_train_test_split <- F
+epsilon <- 1e-3
+lasso_lambda <- 0.1
+exclude_sex_chr <- T
+metric <- prediction_correlation_score
+fragments_response_variable <- "log_total_pme_TPM"
+genes_response_variable <- "log_pme_TPM"
+filter_gene_type <- c("protein_coding")
+```
+
+```{r, include=FALSE}
+# predictors selection
+if(fragments_experiment)
+{
+  response_variable <- fragments_response_variable
+  basic_predictors <- c("log_nucleotides", "CpG_density", "meth_rate")
+  advanced_predictors <- c("meth_autocorrelation", "drift", "meth_sd")
+  msr_related_predictors <- c("msr", "inverted_msr", "ecdf", "inverted_ecdf", "residual", "inverted_residual")
+} else
+{
+  response_variable <- genes_response_variable
+  basic_predictors <- c("log_nucleotides", "CG_density", "log_CG_count", "meth_rate")
+  advanced_predictors <- c("meth_autocorrelation", "drift", "meth_sd")
+  msr_related_predictors <- c("CGsites_msr", "meth_msr", "unmeth_msr", "CG_list_msr", "CG_list_inverted_msr")
+}
+
+basic_and_advanced_predictors <- c(basic_predictors, advanced_predictors)
+all_predictors <- c(basic_predictors, advanced_predictors, msr_related_predictors)
+```
+
+```{r, include=FALSE}
+dir <- "../../Rexperiments/final"
+cell_names <- c("H1", "K562", "GM12878", "GM23248", "Hela", "endodermal", "lung", "stomach")
+
+if(fragments_experiment)
+{
+  msr_fragments_patterns <- c("msr", "1000")
+  expression_fragments_patterns <- c("expression", "1000")
+  log_features <- c("nucleotides", "total_TPM", "total_FPKM", "total_pme_TPM", "total_pme_FPKM")
+  l <- length(cell_names)
+
+  msrL <- lapply(cell_names, function(x) {get_file_names(dir, c(msr_fragments_patterns, x), T)[1] })
+  msr_fragments_tables = lapply(msrL, readRDS)
+  
+  rnaL <- lapply(cell_names, function(x) {get_file_names(dir, c(expression_fragments_patterns, x), T)[1] })
+  rna_fragments_tables = lapply(rnaL, readRDS)
+  
+  data_tables <- lapply(1:l, function(i)
+    {
+    data_table <- join_rna_and_msr_table(rna_fragments_tables[[i]], msr_fragments_tables[[i]])
+    data_table <- add_log_features(data_table, log_features, epsilon)
+    cat("TPM fraction: ", sum(data_table$total_TPM)/1e6, "\n")
+  
+    colnames(data_table)[1] <- "chr"
+    data_table$cell_name <- as.factor(cell_names[i])
+    data_table <- exclude_outliers(data_table, lim = 2.5e5)
+    if(exclude_sex_chr)
+      data_table <- exclude_sex_chromosomes(data_table)
+    data_table
+    }) 
+  
+  remove(msr_fragments_tables); remove(rna_fragments_tables); gc()
+}
+
+if(!fragments_experiment)
+{
+  msr_genes_patterns <- c("msr", "gene")
+  expression_file_patterns <- c(".tsv")
+  dir <- "../../Rexperiments/final/"
+  expr_dir <- "../../Rexperiments/final/rna-seq"
+  log_features <- c("nucleotides","CG_count","TPM", "FPKM", "pme_TPM", "pme_FPKM")
+  
+  l <- length(cell_names)
+
+  msrL <- lapply(cell_names, function(x) {get_file_names(dir, c(msr_genes_patterns, x), T)[1] })
+  msr_genes_tables = lapply(msrL, readRDS)
+  
+  rnaL <- lapply(cell_names, function(x) {get_file_names(expr_dir, c(expression_file_patterns, x), T)[1] })
+  rna_genes_tables = lapply(rnaL, function(file){read_rna_file(file, reduced = F, correct_gene_id = T)})
+  
+    data_tables <- lapply(1:l, function(i)
+    {
+      msr_genes_tables[[i]]$gene_id <- remove_version_from_gene(msr_genes_tables[[i]]$gene_id)
+      data_table <- as.data.frame(merge(msr_genes_tables[[i]], rna_genes_tables[[i]]))
+      if(!is.na(filter_gene_type))
+        data_table <- data_table[data_table$gene_type %in% filter_gene_type, ]
+      cat("TPM fraction: ", sum(data_table$TPM)/1e6, "\n")
+      data_table <- add_log_features(data_table, log_features, epsilon)
+    
+      data_table$cell_name <- as.factor(cell_names[i])
+      #data_table <- data_table[data_table$CG_count>=15, ]
+      #data_table <- data_table[data_table$meth_rate<0.90 & data_table$meth_rate>0.1, ]
+      if(exclude_sex_chr)
+        data_table <- exclude_sex_chromosomes(data_table)
+      data_table
+    }) 
+  
+  remove(msr_genes_tables); remove(rna_genes_tables); gc()
+}
+
+names(data_tables) <- cell_names
+```
+
+
+
+```{r, echo=FALSE}
+# DATASET SPLIT
+
+model_datas <- lapply(1:l, function(i)
+  {
+  dt <- data_tables[[i]]
+  name <- cell_names[i]
+  
+  dt_msr <- dt[complete.cases(dt[,all_predictors]),]
+  dt_basic <- dt[complete.cases(dt[,basic_and_advanced_predictors]),]
+  cat("\n", name, " missing data: ", (1-(length(dt_msr[,1])/length(dt[,1])))*100, "%")
+  cat(" ", name, "basic features: ", (1-(length(dt_basic[,1])/length(dt[,1])))*100, "%")
+
+  split_msr <- train_and_test_split(dt_msr, train_prop, random_train_test_split)
+  split_basic <- train_and_test_split(dt_basic, train_prop, random_train_test_split)
+  
+  dl <- List(train=split_msr$train, test=split_msr$test, train_basic=split_basic$train, test_basic=split_basic$test, name=name)
+  
+  })
+
+names(model_datas) <- cell_names
+merged_model_data <- merge_model_datas(model_datas)
+
+```
+
+```{r, echo=FALSE}
+round(single_correlations_matrix(data_tables, response_variable, all_predictors),2)
+```
+
+```{r, echo=FALSE}
+# LINEAR MODEL BASIC_PREDICTORS
+
+predictors <- basic_predictors
+
+formula <- model_this(response_variable, predictors)
+lms <- lapply(model_datas, function(md){
+  List(model=lm(formula, data = md$train_basic),
+       test_data=md$test_basic)
+  })
+
+perf <- self_test(lms, metric)
+print(round(perf,2))
+cat("\nMerged model:\n ")
+perf <- (test_full_model_on_cells(model = lm(formula, data=merged_model_data$train_basic), test = merged_model_data$test_basic, eval_method = metric))
+print(round(perf,2))
+```
+
+
+```{r ciao, echo=FALSE}
+# LINEAR MODEL BASIC AND ADVANCED PREDICTORS
+
+predictors <- basic_and_advanced_predictors
+
+formula <- model_this(response_variable, predictors)
+lms <- lapply(model_datas, function(md){
+  List(model=lm(formula, data = md$train_basic),
+       test_data=md$test_basic)
+  })
+
+perf <- self_test(lms, metric)
+print(round(perf,2))
+
+cat("\n")
+perf <- cross_matrix_test(lms, metric)
+print(round(perf,2))
+
+cat("\nMerged model:\n ")
+perf <- (test_full_model_on_cells(model = lm(formula, data=merged_model_data$train_basic), test = merged_model_data$test_basic, eval_method = metric))
+print(round(perf,2))
+```
+
+```{r, echo=FALSE}
+# LINEAR MODEL ALL PREDICTORS
+
+predictors <- all_predictors
+
+formula <- model_this(response_variable, predictors)
+lms <- lapply(model_datas, function(md){
+  List(model=lm(formula, data = md$train),
+       test_data=md$test)
+  })
+
+perf <- self_test(lms, metric)
+print(round(perf,2))
+
+cat("\n")
+perf <- cross_matrix_test(lms, metric)
+print(round(perf,2))
+
+cat("\nMerged model:\n ")
+perf <- (test_full_model_on_cells(model = lm(formula, data=merged_model_data$train), test = merged_model_data$test, eval_method = metric))
+print(round(perf,2))
+```
+
+```{r, echo=FALSE}
+# model selection
+
+predictors <- all_predictors
+
+models <- lapply(model_datas, function(md){
+  List(model=lasso(response_variable, md$train[,c(response_variable, predictors)], lasso_lambda),
+       test_data=md$test)
+  })
+
+eval_f <- function(m,d) {prediction_correlation_score.glmnet(m, d, response_variable, predictors)}
+
+perf <- self_test(models, eval_f)
+print(round(perf,2))
+
+cat("\n")
+perf <- cross_matrix_test(models, eval_f)
+print(round(perf,2))
+
+cat("\nMerged model:\n ")
+merged_lasso <- lasso(response_variable, merged_model_data$train[,c(response_variable, predictors)], lasso_lambda)
+perf <- (test_full_model_on_cells(model = merged_lasso, test = merged_model_data$test, eval_method = eval_f))
+print(round(perf,2))
+```
+
+```{r, echo=FALSE}
+# model selection
+
+coeff_matrix <- sapply(1:(length(models)+1), function(i)
+  {
+
+  if(i==(length(models)+1))
+  {
+    dat <- merged_model_data
+    mod <- merged_lasso
+  }
+  else
+  {
+    dat <- model_datas[[i]]
+    mod <- models[[i]]$model
+  }
+
+  ss <- scale(as.matrix.data.frame(dat$train[, c(predictors)]))
+  s <- attr(ss, 'scaled:scale')
+  s*mod$beta[,1]
+  })
+
+colnames(coeff_matrix) <- c(cell_names, "Merged")
+round(coeff_matrix,2)
+```
+
+
+```{r, echo=FALSE}
+# GRADIENT BOOSTING
+
+predictors <- basic_and_advanced_predictors
+model_data <- merged_model_data
+dtrain <- xgb.DMatrix(data = as.matrix(model_data$train_basic[, predictors]), label=as.matrix(model_data$train_basic[, response_variable]))
+
+dtest <- xgb.DMatrix(data = as.matrix(model_data$test_basic[, predictors]), label=as.matrix(model_data$test_basic[, response_variable]))
+
+bstDense <- xgboost(data = dtrain, nrounds = 10, objective = "reg:squarederror", verbose = F)
+
+pred <- predict(bstDense, dtest)
+sapply(cell_names, function(cn)
+  {
+  dtest <- xgb.DMatrix(data = as.matrix(model_data$test_basic[model_data$test_basic$cell_name==cn, predictors]), label=as.matrix(model_data$test_basic[model_data$test_basic$cell_name==cn, response_variable]))
+
+  pred <- predict(bstDense, dtest)
+  cor(pred, model_data$test_basic[model_data$test_basic$cell_name==cn, response_variable])
+  })
+
+```
+
+
+```{r, echo=FALSE}
+# RANDOM FOREST ALL PREDICTORS
+# 
+# predictors <- basic_and_advanced_predictors
+# 
+# formula <- model_this(response_variable, predictors)
+# rfs <- lapply(model_datas, function(md){
+#   List(model=model <- randomForest(formula, data = md$train, importance = T, ntree = 10),
+#        test_data=md$test)
+#   })
+# 
+# perf <- self_test(rfs, metric)
+# print(round(perf,2))
+# cat("\nMerged model:\n ")
+# 
+# cat("\n")
+# perf <- cross_matrix_test(lms, metric)
+# print(round(perf,2))
+# 
+# rf_merged <- randomForest(formula, data = merged_model_data$train, importance = T, ntree = 10)
+# perf <- (test_full_model_on_cells(model = rf_merged, test = merged_model_data$test, eval_method = metric))
+# print(round(perf,2))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -35,8 +35,8 @@ v2[400:500] <- 1
 v2[600:800] <- 0
 
 
-reconstruction_test(v2, 0.06, 100, 1, replace_nas_hybrid_stochastic)
-reconstruction_test(v2, 0.1, 100, 1, replace_nas_with_bin_prop)
+reconstruction_test(v2, 0.1, 500, 1, replace_nas_hybrid_stochastic)
+reconstruction_test(v2, 0.1, 200, 1, replace_nas_with_bin_prop)
 
-reconstruction_test(v, 0.1, 200, 1, replace_nas_hybrid_stochastic)
-reconstruction_test(v, 0.1, 200, 1, replace_nas_with_bin_prop)
+reconstruction_test(v, 0.1, 500, 1, replace_nas_hybrid_stochastic)
+reconstruction_test(v, 0.1, 500, 1, replace_nas_with_bin_prop)

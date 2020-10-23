@@ -2,32 +2,54 @@ suppressMessages(library(data.table))
 suppressMessages(library(pracma))
 suppressMessages(library(parallel))
 suppressMessages(library(scales))
-#suppressMessages(library("markovchain"))
 
-calculate_relevance_from_counts <- function(vector, M)
+calculate_relevance_from_counts <- function(counts, M=NA)
 {
-  M <- sum(vector) #efficiency ?
-  t <- table(vector)
-  m_k <- as.integer(t)
-  k <- as.integer(names(t))
+  if(is.na(M))
+    M <- sum(counts) #efficiency ?
+  m_k <- tabulate(counts+1)
+  k <- 0:(length(m_k)-1)
   
-  # probability that a methyle belongs to a bin with k methyles
   p <- (k*m_k)/M
-  return(-sum(p*log(p+1E-10, M)))
+  return(-sum(p*log(p+1E-20, M)))
 }
 
-
-calculate_resolution_from_counts <- function(counts, M)
+calculate_resolution_from_counts_old <- function(counts, M=NA)
 {
-  M <- sum(counts)
+  if(is.na(M))
+    M <- sum(counts)
   p <- counts/M
-  return(-sum(p*log(p+1E-10,base = M)))
+  return(-sum(p*(log(counts+1E-20,base = M)-1)))
+}
+
+calculate_resolution_from_counts <- function(counts, M=NA)
+{
+  if(is.na(M))
+    M <- sum(counts)
+  p <- counts[counts>0]/M
+  #return(-sum(p*(log(counts+1E-20,base = M)-1)))
+  return(-sum(p*log(p,base = M)))
+}
+
+efficient_resolution_relevance_from_counts <- function(counts, M=NA)
+{
+  if(is.na(M)) M <- sum(counts)
+  if(M<=1) return(c(NA,NA))
+  m_k <- tabulate(counts+1)
+  k <- 0:(length(m_k)-1)
+  
+  p <- (k*m_k)/M
+  epsilon <- 1e-20
+  resolution <- -sum(p*(log(k+epsilon,M)-1))
+  relevance <- -sum(p*log(p+epsilon, M))
+  return(c(relevance, resolution))
 }
 
 meth_prop <- function(meth_vector)
 {
-  valid_meth <- meth_vector[!is.na(meth_vector)]
-  sum(valid_meth)/length(valid_meth)
+  #valid_meth <- meth_vector[!is.na(meth_vector)]
+  #sum(valid_meth)/length(valid_meth)
+  mean(meth_vector,na.rm=T)
 }
 
 stochastic_round <- function(v)
@@ -83,6 +105,7 @@ corrected_cumsum <- function(vector)
 # PLEASE USE A SPARSE MATRIX IF POSSIBLE
 calculate_relevance_and_resolution_ignoring_nas <- function(cumulative_sum_vector, bin_size) 
 {
+  #s<-Sys.time(); 
   l <- length(cumulative_sum_vector)-1
   #if(bin_size==1) return(c(0,1,1,1))
   #print(bin_size)
@@ -90,8 +113,9 @@ calculate_relevance_and_resolution_ignoring_nas <- function(cumulative_sum_vecto
   
   #starting_points <- ((1:ceiling(l/bin_size))*bin_size)-bin_size+1
   starting_points <- seq(from = 1, to = l, by = bin_size)
+  #cat("pre:", Sys.time()-s); s<-Sys.time(); 
   counts  <-  cumulative_sum_vector[pmin(starting_points+bin_size, l+1)]-cumulative_sum_vector[starting_points]
-  
+  #cat("counts:", Sys.time()-s); s<-Sys.time();
   if(l/bin_size > 1E8)
   {
     # it's useful to save memory, but for large bin size this would just slow down
@@ -100,10 +124,11 @@ calculate_relevance_and_resolution_ignoring_nas <- function(cumulative_sum_vecto
   }
 
   M <- cumulative_sum_vector[l+1]
-  relevance <- calculate_relevance_from_counts(counts, M)
-  resolution <- calculate_resolution_from_counts(counts, M)
-
-  return(c(relevance, resolution, bin_size, 1))
+  #relevance <- calculate_relevance_from_counts(counts, M)
+  #cat("rel:", Sys.time()-s); s<-Sys.time();
+  #resolution <- calculate_resolution_from_counts(counts, M)
+  #cat("res:", Sys.time()-s); s<-Sys.time();
+  return(c(efficient_resolution_relevance_from_counts(counts, M), bin_size, 1))
 }
 
 
@@ -161,15 +186,9 @@ calculate_relevance_and_resolution <- function(methylation_vector, cumulative_su
   }
   
 
-  
-  M <- sum(effective_counts)
-
-  relevance <- calculate_relevance_from_counts(effective_counts, M)
-  resolution <- calculate_resolution_from_counts(effective_counts, M)
-
   if(verbose) cat("bin_size:", bin_size, " valid_bins_found:", valid_bins_found, "effective data:", (bin_size*valid_bins_found)/data_size, "\n")
 
-  return(c(relevance, resolution, bin_size, effective_data))
+  return(c(efficient_resolution_relevance_from_counts(effective_counts), bin_size, effective_data))
 }
 
 
@@ -185,7 +204,7 @@ good_bin_sizes <- function(n, max_bins = 100, losing_data_prop = 0.1)
   return(b)
 }
 
-good_bin_sizes <- function(n, max_bins = 100, losing_data_prop = NA)
+good_bin_sizesV2 <- function(n, max_bins = 100, losing_data_prop = NA)
 {
   return(unique(round((exp(linspace(log(1), log(n), n = max_bins))))))
 }
@@ -234,7 +253,7 @@ calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vecto
   
   l <- length(methylation_vector)
   bin_sizes <- good_bin_sizes(l, max_bins)
-  bin_sizes <- bin_sizes[(bin_sizes>minimum_bin_size) | (bin_sizes==1) ]
+  bin_sizes <- bin_sizes[(bin_sizes>=minimum_bin_size)]
   
   methylation_vector[is.na(methylation_vector)] <- 0
   
@@ -249,10 +268,11 @@ calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vecto
   out <- (sapply(bin_sizes, function(x) 
   { 
     if(verbose) cat(x, "...\n")
-    calculate_relevance_and_resolution_ignoring_nas(cumulative_sum_vector, bin_size = x)
+    calculate_relevance_and_resolution_ignoring_nas(cumulative_sum_vector, x)
   }))
   
-  out <- add_max_resolution_point_if_needed(out)
+  if(!is.na(out[1,1]))
+    out <- add_max_resolution_point_if_needed(out)
   
   if(verbose) print(Sys.time()-start_time)
   
@@ -281,46 +301,62 @@ calculate_relevance_resolution_vector_with_positions <- function(positions, max_
   return(out)
 }
 
-genome_MSR <- function(methylation_positions, minimum_bin_size = 10, verbose = F, invert = F, msr = T, max_bins = 100)
+genome_MSR <- function(methylation_positions, minimum_bin_size = 1, verbose = F, invert = F, msr = T, max_gbins = 100, max_bins = 1e6)
 {
   if(length(methylation_positions)<2) return(NA)
   v = methylation_positions - min(methylation_positions) + 1
   l <- max(v)
   #cat("\n", l)
   v = sparseVector(i = v, x = T, length = l)
-  bin_size_limit <- ceiling(l/1e5) 
+  bin_size_limit <- ceiling(l/max_bins) 
   #cat("\nbin_size_limit:", bin_size_limit, "max(v):", l, "\n")
-  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = max(minimum_bin_size, bin_size_limit), invert = invert, verbose = verbose, max_bins = max_bins)
+  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = max(minimum_bin_size, bin_size_limit), invert = invert, verbose = verbose, max_bins = max_gbins)
   if(msr)
     return(MSR_area(rr))
   return(rr)
 }
 
-positions_MSR <- function(positions, discretization_bin_size = NA, verbose = F, msr = T, max_bins = 1e6, discrete = F,  max_gbins = 100)
+
+positions_MSR <- function(positions, discretization_bin_size = NA, verbose = F, msr = T, max_bins = 1e6, discrete = F,  max_gbins = 100, timing = F)
 {
+  if(timing)
+    tim <- Sys.time(); 
   if(length(positions)<2) return(NA)
   positions <- positions[!is.na(positions)]
-  positions <- positions-min(positions)
+  positions <- positions-min(positions)+1
   
-  if(is.na(discretization_bin_size))
+  if(!discrete)
   {
-    s <- sort(positions)
-    discretization_bin_size <- min(s[2:length(s)]-s[1:(length(s)-1)])
+    if(is.na(discretization_bin_size))
+    {
+      s <- sort(positions)
+      discretization_bin_size <- min(s[2:length(s)]-s[1:(length(s)-1)])
+    }
+    
+    #print(discretization_bin_size)
+    breaks <- floor(min(max_bins, (max(positions)-min(positions))/discretization_bin_size)*1)
+    #print(breaks)
+    v <- hist(positions, plot = F, breaks = breaks)$counts
+    #print(v) 
+    minimum_bin_size = 1
   }
-  #print(discretization_bin_size)
-  breaks <- floor(min(max_bins, (max(positions)-min(positions))/discretization_bin_size)*1)
-  #print(breaks)
-  v <- hist(positions, plot = F, breaks = breaks)$counts
-  #print(v)
-  
-  if(discrete)
+  else
   {
-    gc()
-    positions <- sort(positions+1)
+    positions <- sort(positions)
     v <- sparseVector(i = positions, x = T, length = max(positions))
+    minimum_bin_size = 2
   }    
 
-  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = 1, verbose = verbose,  max_bins = max_gbins)
+  if(timing)
+    cat("\n precomp time: ", Sys.time()-tim)
+  
+  if(timing)
+    s <- Sys.time(); 
+  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = minimum_bin_size, verbose = verbose,  max_bins = max_gbins)
+  
+  if(timing)
+    cat("\n calculation time: ", Sys.time()-s, "\n")
+  
   if(msr)
     return(MSR_area(rr))
   cat(MSR_area(rr))
@@ -786,7 +822,7 @@ plot_positions <- function(positions)
   points(x = positions/max(positions), y=array(data = 0, dim = length(positions)), pch = "|", ylab = "")
 }
 
-MSR_example <- function(positions, perturb = 0)
+MSR_example <- function(positions, perturb = 0, max_gbins = 50)
 {
   if(perturb)
   {
@@ -795,14 +831,14 @@ MSR_example <- function(positions, perturb = 0)
     positions <- s + rnorm(length(s), sd = sd)
   }
   
-  rr <- positions_MSR(positions, msr = F)
+  rr <- positions_MSR(positions, msr = F, max_gbins = max_gbins)
   msr <- MSR_area(rr)
   plot_positions(positions - min(positions))
   resolution_relevance_plot(rr)
   title(paste("MSR:", round(msr, digits = 3)))
 }
 
-MSR_visualization <- function(positions, discretization_bin_size = NA, perturb = 0)
+MSR_visualization <- function(positions, discretization_bin_size = NA, perturb = 0, max_bins = 1e6, maxg_bins = 50)
 {
   if(perturb)
   {
@@ -811,7 +847,7 @@ MSR_visualization <- function(positions, discretization_bin_size = NA, perturb =
     positions <- s + rnorm(length(s), sd = sd)
   }
     
-  rr <- positions_MSR(positions, discretization_bin_size, F, F, max_bins = 1e6)
+  rr <- positions_MSR(positions, discretization_bin_size, F, F, max_bins = max_bins, max_gbins = maxg_bins)
   msr <- MSR_area(rr)
   resolution_relevance_plot(rr)
   title(paste("MSR:", round(msr, digits = 4)))
@@ -883,51 +919,19 @@ make_random_msr_data_frame <- function(length, samples, lw = 0, hp = 1)
   return(data.frame(p=p,msr=msr))
 }
 
-make_random_msr_data_frame2 <- function(samples, lw = 100, hp = 10000, verbose = F)
+make_random_msr_data_frame2 <- function(samples, lw = 100, hp = 10000, verbose = F, log = T)
 {
-  M <- round(runif(samples, lw, hp))
+  if(!log)
+    M <- round(runif(samples, lw, hp))
+  else
+    M <- round(10^(runif(samples, log(lw,10), log(hp,10))))
   msr <- array(dim = samples)
   for(i in 1:samples)
   {
     v <- runif(M[i])
-    msr[i] <- positions_MSR(v, max_gbins = 20)
+    msr[i] <- positions_MSR(v, max_gbins = 50, max_bins = M[i]*10)
     if(verbose) cat(i, "")
   }
   
   return(data.frame(M=M,msr=msr))
 }
-
-
-
-
-# calculate_relevance_and_resolution_ignoring_nas <- function(methylation_vector, cumulative_sum_vector, bin_size) 
-# {
-#   
-#   l <- length(cumulative_sum_vector)-1
-#   #if(bin_size==1) return(c(0,1,1,1))
-#   #print(bin_size)
-#   if(bin_size==l) return(c(0,0,l,NA))
-#   
-#   bin_sizes
-#   starting_points_sparse_matrix <- linspace(1, l, n = ceiling(l/bin_sizes))
-#   counts_sparse_matrix <- 
-#   resolutions <-
-#   relevances <- 
-#     
-#     
-#   starting_points <- ((1:ceiling(l/bin_size))*bin_size)-bin_size+1
-#   counts  <-  cumulative_sum_vector[pmin(starting_points+bin_size, l+1)]-cumulative_sum_vector[starting_points]
-#   
-#   if(l/bin_size > 1E8)
-#   {
-#     # it's useful to save memory, but for large bin size this would just slow down
-#     remove(starting_points)
-#     gc(verbose = F)
-#   }
-#   
-#   M <- cumulative_sum_vector[l+1]
-#   relevance <- calculate_relevance_from_counts(counts, M)
-#   resolution <- calculate_resolution_from_counts(counts, M)
-#   
-#   return(c(relevance, resolution, bin_size, 1))
-# }

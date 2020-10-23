@@ -175,7 +175,7 @@ basic_test_model_data = model_data_basic[test_rows,]
 
 
 ```{r, echo=FALSE}
-check_model <- function(train_model_data, test_model_data, response_variable, predictors, summary = T)
+check_model <- function(train_model_data, test_model_data, response_variable, predictors, summary = T, model_out = F)
 {
   formula <- as.formula(paste(response_variable, "~ ."))
   model = lm(formula, data = train_model_data[, c(response_variable, predictors)])
@@ -187,6 +187,8 @@ check_model <- function(train_model_data, test_model_data, response_variable, pr
   }
   cat("Test data R squared: ", tmse(model, test_model_data, response_variable))
   #1-(var(predict(model, test_model_data, type="response")-test_model_data$log_tpm))/var(test_model_data$log_tpm) )
+  if(model_out)
+    return(model)
 }
 ```
 
@@ -260,4 +262,72 @@ test_data <- test_data[rows, ]
 y_true <- test_data[, response_variable]
 y_pred <- predict(model, test_data, type = "response")
 plot(y_pred, y_true, col = alpha(1,0.5), main = paste("pearson corr:", round(cor(y_true, y_pred),3)))
+```
+
+
+Interpretation
+
+```{r, echo=FALSE}
+data_table$predicted_expr <- predict(model, data_table, type = "response")
+data_table$index <- 1:length(data_table$gene_id)
+data_table$prediction_difference <- data_table[,response_variable] - data_table$predicted_expr 
+
+wgbs <- sum_strands(readRDS("../../../MethylationCode/MethylationData/wgbs/K562.Rda"), verbose = T)
+```
+
+Regions with high predicted expression and low error
+```{r, echo=FALSE}
+indexes1 <- order(data_table$predicted_expr, decreasing = T)[1:60]
+high_pred_data <- data_table[indexes1, ]
+indexes2 <- order(abs(high_pred_data$prediction_difference), decreasing = F)
+high_pred_data <- high_pred_data[indexes2, ]
+
+par(mfrow = c(2,2))
+for(i in 1:4)
+{
+  show_region_meth(wgbs, high_pred_data$chr[i], high_pred_data$start[i], high_pred_data$end[i], prop = T, genomewide = T)
+  cat(high_pred_data$prediction_difference[i], "\n")
+}
+```
+
+regions with low predicted expression and low error
+```{r, echo=FALSE}
+indexes1 <- order(data_table$predicted_expr, decreasing = F)[1:50]
+high_pred_data <- data_table[indexes1, ]
+indexes2 <- order(abs(high_pred_data$prediction_difference), decreasing = F)
+high_pred_data <- high_pred_data[indexes2, ]
+
+par(mfrow = c(2,2))
+for(i in 1:4)
+{
+  show_region_meth(wgbs, high_pred_data$chr[i], high_pred_data$start[i], high_pred_data$end[i], prop = T, genomewide = T)
+  cat(high_pred_data$prediction_difference[i], "\n")
+}
+```
+
+
+Regions with true expression >> predicted
+```{r, echo=FALSE}
+indexes1 <- order(data_table$prediction_difference, decreasing = T)[1:10]
+high_pred_data <- data_table[indexes1, ]
+
+par(mfrow = c(2,2))
+for(i in 1:4)
+{
+  show_region_meth(wgbs, high_pred_data$chr[i], high_pred_data$start[i], high_pred_data$end[i], prop = T, genomewide = T)
+  cat(high_pred_data$prediction_difference[i], "\n")
+}
+```
+
+Regions with true expression << predicted
+```{r, echo=FALSE}
+indexes1 <- order(data_table$prediction_difference, decreasing = F)[1:10]
+high_pred_data <- data_table[indexes1, ]
+
+par(mfrow = c(2,2))
+for(i in 1:4)
+{
+  show_region_meth(wgbs, high_pred_data$chr[i], high_pred_data$start[i], high_pred_data$end[i], prop = T, genomewide = T)
+  cat(high_pred_data$prediction_difference[i], "\n")
+}
 ```
