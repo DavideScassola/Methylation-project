@@ -60,15 +60,14 @@ cat("\ntotal TPM: ", sum(data_table$total_TPM/1e6, na.rm = T))
 
 
 ```{r, include=FALSE}
-xn <- "meth rate"
+xn <- "meth_rate"
 yn <- "meth_autocorrelation"
 
-gn <- data_table$gene_count
-x <- data_table$`meth rate`
+x <- data_table$meth_rate
 y <- data_table$meth_autocorrelation
-ltpm <- log(data_table$total_TPM+1)
-group <- as.factor(data_table$total_TPM>1)
-df <- na.omit(data.frame(x,y,group, ltpm, gn))
+ltpm <- data_table$log_total_pme_TPM
+group <- as.factor(data_table$total_pme_FPKM>0)
+df <- na.omit(data.frame(x,y,group, ltpm))
 #df <- df[df$gn>0,]
 ```
 
@@ -83,6 +82,12 @@ scatterPlot <- ggplot(df[sample(1:length(df[,1]), size = 2e3) , ], aes(x, y, col
 scatterPlot
 
 scatterPlot <- ggplot(df[sample(1:length(df[,1]), size = 10e3), ], aes(x, y, color=ltpm)) + geom_point(alpha = 1) + scale_colour_gradient(low = c1, high = "green", na.value = NA, name = "log(TPM)") + theme(legend.position=c(0,1), legend.justification=c(0,1)) + labs(x = xn, y=yn, title = "Stomac tissue, fragments of 1000 CG sites")
+scatterPlot
+
+
+
+  
+  ggplot(df[sample(1:length(df[,1]), size = 10e3), ], aes(x, y, color=ltpm)) + geom_point(alpha = 1) +  scale_colour_gradient(low = c1, high = "green", na.value = NA, name = "log(TPM)") + theme(legend.position=c(0,1), legend.justification=c(0,1)) + labs(x = xn, y=yn, title = "Stomac tissue, fragments of 1000 CG sites")
 scatterPlot
 
 # Marginal density plot of x (top panel)

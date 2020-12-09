@@ -75,6 +75,13 @@ replace_nas_with_bin_prop <- function(effective_counts_and_na, bin_size, methyla
   return(stochastic_round(effective_counts_and_na[1,] + effective_counts_and_na[2,]*estimated_prop))
 }
 
+replace_nas_with_bin_prop_deterministic <- function(effective_counts_and_na, bin_size, methylation_vector)
+{
+  estimated_prop <- effective_counts_and_na[1,]/(bin_size-effective_counts_and_na[2,])
+  estimated_prop[is.na(estimated_prop)] <- 0
+  return(round(effective_counts_and_na[1,] + effective_counts_and_na[2,]*estimated_prop))
+}
+
 replace_nas_hybrid <- function(effective_counts_and_na, bin_size, methylation_vector)
 {
   bin_estimated_prop <- effective_counts_and_na[1,]/(bin_size-effective_counts_and_na[2,])
@@ -303,6 +310,7 @@ calculate_relevance_resolution_vector_with_positions <- function(positions, max_
 
 genome_MSR <- function(methylation_positions, minimum_bin_size = 1, verbose = F, invert = F, msr = T, max_gbins = 100, max_bins = 1e6)
 {
+  methylation_positions <- na.omit(methylation_positions)
   if(length(methylation_positions)<2) return(NA)
   v = methylation_positions - min(methylation_positions) + 1
   l <- max(v)
@@ -378,8 +386,7 @@ MSR_area<- function(rr_vector)
 
 calculate_MSR_area<- function(v)
 {
-  rr <- calculate_relevance_resolution_vector_ignoring_nas(v, verbose = F)
-  MSR_area(rr)
+  MSR_area(calculate_relevance_resolution_vector_ignoring_nas(v, verbose = F))
 }
 
 
@@ -853,11 +860,11 @@ MSR_visualization <- function(positions, discretization_bin_size = NA, perturb =
   title(paste("MSR:", round(msr, digits = 4)))
 }
 
-rr_curve_comparison <- function(v_list, legend_names, add_msr = T, discrete = F)
+rr_curve_comparison <- function(v_list, legend_names, add_msr = T, discrete = F, max_gbins = 20)
 {
   rr_list <- lapply(v_list, function(x)
     {
-    positions_MSR(x, 1, F, F, max_bins = 1e6, discrete = discrete)
+    positions_MSR(x, max_bins = 1e6, discrete = discrete, max_gbins = max_gbins, msr = F)
   })
   
   
@@ -875,7 +882,8 @@ rr_curve_comparison <- function(v_list, legend_names, add_msr = T, discrete = F)
     plotter = points
   }
   
-  legend("topleft", legend=legend_names[ord], col=ord+1, lty = 1, cex = 0.8, y.intersp = 0.5)
+  legend("topleft", legend=legend_names[ord], col=ord+1, y.intersp = 1, cex = 1.1, bty = "n", fill=ord+1, x.intersp = 0.3)
+  
 }
 
 filter_by_range <- function(v, min, max)
@@ -905,12 +913,14 @@ basis_pattern_rr_curve_comparison <- function(patterns, chromosome, min, max, Ge
 #methylation_vector <- as.logical(readRDS("MethylationData/binary_rate/GSM3436261_O1_TA_Hi_10_converted.Rda"))
 
 
-make_random_msr_data_frame <- function(length, samples, lw = 0, hp = 1)
+make_random_msr_data_frame <- function(length, samples, lw = 0, hp = 1, verbose = T)
 {
   p <- runif(samples, lw, hp)
   msr <- array(dim = samples)
   for(i in 1:samples)
   {
+    if(verbose)
+      cat(i, " ")
     v <- rbinom(length, 1, p[i])
     msr[i] <- calculate_MSR_area(v)
     p[i] <- mean(v)
@@ -919,8 +929,11 @@ make_random_msr_data_frame <- function(length, samples, lw = 0, hp = 1)
   return(data.frame(p=p,msr=msr))
 }
 
-make_random_msr_data_frame2 <- function(samples, lw = 100, hp = 10000, verbose = F, log = T)
+make_random_msr_data_frame2 <- function(samples, lw = 100, hp = 10000, verbose = F, log = T, perfect_method = F, distr = runif)
 {
+  method <- positions_MSR
+  if(perfect_method)
+    method <- correct_positions_MSR
   if(!log)
     M <- round(runif(samples, lw, hp))
   else
@@ -928,10 +941,79 @@ make_random_msr_data_frame2 <- function(samples, lw = 100, hp = 10000, verbose =
   msr <- array(dim = samples)
   for(i in 1:samples)
   {
-    v <- runif(M[i])
-    msr[i] <- positions_MSR(v, max_gbins = 50, max_bins = M[i]*10)
+    v <- distr(M[i])
+    msr[i] <- method(v, max_gbins = 50, max_bins = M[i]*30)
     if(verbose) cat(i, "")
   }
   
   return(data.frame(M=M,msr=msr))
 }
+
+find_correct_position <- function(vector, target, start)
+{
+  for(i in start:length(vector))
+    if(target<vector[i])
+      return(i)
+  return(length(vector)+1)
+}
+
+assign_positions <- function(vector, target)
+{
+  l <- length(vector)
+  pos <- array(dim=length(target)+1)
+  pos[1]<-1
+  for(i in 1:length(target))
+  {
+    #cat("ciao: ", i)
+    pos[i+1] <- find_correct_position(vector, target[i], pos[i])
+  }
+  pos[2:length(pos)]#-1
+}
+
+my_hist <- function(ordered_sample, n_bins, sorted = F)
+{
+  if(!sorted)
+    ordered_sample <- sort.default(ordered_sample)
+  p <- assign_positions(sort.default(ordered_sample), linspace(min(ordered_sample),max(ordered_sample),n_bins+1))
+  v <- 1:(length(p)-1)
+  p[v+1]-p[v]
+}
+
+
+correct_positions_MSR <- function(positions, msr = T, max_bins = 1e6, max_gbins = 100, timing = F)
+{
+  if(timing)
+    tim <- Sys.time(); 
+  
+  if(length(positions)<2) return(NA)
+  positions <- positions[!is.na(positions)]
+  positions <- sort.default(positions)
+  a <- min(positions)
+  b <- max(positions)
+  
+  minimum_bin_size <- max(((b-a)/max_bins), min(positions[2:length(positions)]-positions[1:(length(positions)-1)]) )
+  minimum_bin_size <- min(minimum_bin_size, ((b-a)/100))
+  gbins <- rev(good_bin_sizesV2(round((b-a)/minimum_bin_size), max_gbins))
+  #gbins <- gbins(0,gbins)
+
+  if(timing)
+    cat("\n precomp time: ", Sys.time()-tim)
+  
+  if(timing)
+    s <- Sys.time(); 
+    rr <- sapply(gbins, function(bins){
+      c <- hist(positions, plot = F, breaks = linspace(a,b,bins+1))$counts
+      c(efficient_resolution_relevance_from_counts(c), bins, 1)
+      })
+  
+  rr <- add_max_resolution_point_if_needed(rr)
+  
+  if(timing)
+    cat("\n calculation time: ", Sys.time()-s, "\n")
+  
+  if(msr)
+    return(MSR_area(rr))
+  cat(MSR_area(rr))
+  return(rr)
+}
+

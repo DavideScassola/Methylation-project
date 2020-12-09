@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(ggfortify)
 library(randomForest)
 library(xgboost)
+#library(tidyverse)
 library("PerformanceAnalytics")
 source("WGBS_analysis_functions.R", chdir = T)
 ```
@@ -31,10 +32,25 @@ self_test <- function(models_and_test, eval_method = tmse)
   sapply(models_and_test, function(mt){eval_method(mt$model, mt$test)})
 }
 
+x_from1_y_from2 <- function(d1,d2,x_names,y_names,identifier)
+{
+  merge(d1[,c(x_names,identifier)], d2[,c(y_names,identifier)])
+}
+
 cross_matrix_test <- function(models_and_test, eval_method = tmse)
 {
   sapply(models_and_test, function(mt1){
     sapply(models_and_test, function(mt2) {eval_method(mt2$model, mt1$test)})})
+}
+
+cross_matrix_test_swap_expression <- function(models_and_test, eval_method = tmse, identifier)
+{
+  sapply(models_and_test, function(mt1) {
+    sapply(models_and_test, function(mt2) {
+      x_names <- attr(mt2$model$terms , "term.labels")
+      y_name <- as.character(formula(mt2$model)[2])
+      test <- x_from1_y_from2(mt2$test,mt1$test,x_names,y_name,identifier)
+      eval_method(mt2$model, test) })})
 }
 
 merge_model_datas <- function(model_datas)
@@ -48,6 +64,14 @@ merge_model_datas <- function(model_datas)
   final_data
 }
 
+merge_data_tables <- function(data_tables)
+{
+  final_data = data_tables[[1]]
+  for(i in 2:length(data_tables))
+      final_data <- rbind(final_data, data_tables[[i]] )
+  final_data
+}
+
 test_full_model_on_cells <- function(model, test, eval_method = tmse)
 {
   cells_factors <- as.factor(levels(test$cell_name))
@@ -58,6 +82,61 @@ test_full_model_on_cells <- function(model, test, eval_method = tmse)
 
 r2 <- function(a,b) {prediction_correlation_score(a,b)^2}
 
+correlation_matrix <- function(data_tables, variable_name, identifier)
+{
+  D <- lapply(names(data_tables), function(nam){
+    d <- data_tables[[nam]]
+    d<-d[,c(variable_name, identifier)]
+    colnames(d)[(colnames(d)==variable_name)]<-nam
+    d
+    })
+  
+  l <- length(D)
+  data <- D[[1]][complete.cases( D[[1]]),]
+  for(i in 2:l)
+    data <- merge(data, D[[i]][complete.cases(D[[i]]),], by = identifier, all = F)
+  
+  cor(data[,colnames(data)!=identifier])
+  
+}
+
+
+get_difference_dataset <- function(data1, data2, response_variable, predictors, most_n_diff, dist = abs, id = NA)
+{
+  if(!is.na(id))
+  {
+    ids <- (intersect(data1[,id], data2[,id]))
+    data1 <- data1[data1[,id] %in% ids,]
+    data2 <- data2[data2[,id] %in% ids,]
+    
+    if(any(data1$gene_id!=data2$gene_id))
+      cat("ERROR: DIFFERENTIALLY ORDERED GENES!!!")
+  }
+  if((! "i_end" %in% colnames(data1)) || (! "i_end" %in% colnames(data2)))
+  {
+    size <- data1$i_start[2]-data1$i_start[1]-1
+    data1$i_end <- data1$i_start+size
+    data2$i_end <- data1$i_start+size
+  }
+  
+  data2$i_start <- 0
+  data2$i_end <- 0
+  vv <- c(response_variable, predictors, "i_start", "i_end")
+  difference <- data1[,vv]-data2[,vv]
+  difference <- difference[complete.cases(difference),]
+
+  difference[order(-dist(difference[,response_variable])),][1:most_n_diff,]
+}
+
+differential_correlations_analysys <- function(difference_dataset, response_variable=NA)
+{
+  M <- cor(difference_dataset)
+  if(is.na(response_variable))
+    return(M)
+  else
+    return(M[response_variable,])
+}
+
 ```
 
 ```{r, include=FALSE}
@@ -67,29 +146,33 @@ fragments_experiment <- T
 ```{r, include=FALSE}
 # general paramenters
 train_prop <- 0.7
-random_train_test_split <- F
-epsilon <- 1e-3
+random_train_test_split <- T
+max_missing_prop <- 0.1
+epsilon <- 2^(-4)
 lasso_lambda <- 0.1
 exclude_sex_chr <- T
 metric <- prediction_correlation_score
 fragments_response_variable <- "log_total_pme_TPM"
 genes_response_variable <- "log_pme_TPM"
 filter_gene_type <- c("protein_coding")
+
 ```
 
 ```{r, include=FALSE}
 # predictors selection
 if(fragments_experiment)
 {
+  identifier <- "i_start"
   response_variable <- fragments_response_variable
   basic_predictors <- c("log_nucleotides", "CpG_density", "meth_rate")
-  advanced_predictors <- c("meth_autocorrelation", "drift", "meth_sd")
-  msr_related_predictors <- c("msr", "inverted_msr", "ecdf", "inverted_ecdf", "residual", "inverted_residual")
+  advanced_predictors <- c("meth_autocorrelation", "mean_bernoulli_entropy", "meth_sd")
+  msr_related_predictors <- c("CGsites_msr","msr", "inverted_msr", "ecdf", "inverted_ecdf", "residual", "inverted_residual")
 } else
 {
+  identifier <- "gene_id"
   response_variable <- genes_response_variable
   basic_predictors <- c("log_nucleotides", "CG_density", "log_CG_count", "meth_rate")
-  advanced_predictors <- c("meth_autocorrelation", "drift", "meth_sd")
+  advanced_predictors <- c("meth_autocorrelation", "mean_bernoulli_entropy", "meth_sd")
   msr_related_predictors <- c("CGsites_msr", "meth_msr", "unmeth_msr", "CG_list_msr", "CG_list_inverted_msr")
 }
 
@@ -99,10 +182,12 @@ all_predictors <- c(basic_predictors, advanced_predictors, msr_related_predictor
 
 ```{r, include=FALSE}
 dir <- "../../Rexperiments/final"
-cell_names <- c("H1", "K562", "GM12878", "GM23248", "Hela", "endodermal", "lung", "stomach")
+fragments_cell_names <- c("H1", "K562", "GM12878", "GM23248", "Hela", "endodermal", "lung", "stomach")
+genes_cell_names <- c("H1", "K562", "GM12878", "GM23248", "Hela", "endodermal")
 
 if(fragments_experiment)
 {
+  cell_names <- fragments_cell_names
   msr_fragments_patterns <- c("msr", "1000")
   expression_fragments_patterns <- c("expression", "1000")
   log_features <- c("nucleotides", "total_TPM", "total_FPKM", "total_pme_TPM", "total_pme_FPKM")
@@ -113,6 +198,16 @@ if(fragments_experiment)
   
   rnaL <- lapply(cell_names, function(x) {get_file_names(dir, c(expression_fragments_patterns, x), T)[1] })
   rna_fragments_tables = lapply(rnaL, readRDS)
+
+    # making equal columns
+  
+    cn <- colnames(msr_fragments_tables[[1]])
+    for(i in 2:l)
+    {
+    cn <- cn[(cn %in% colnames(msr_fragments_tables[[i]]) )]
+    }
+    
+    msr_fragments_tables <- lapply(msr_fragments_tables, function(mft) {mft[,cn]})
   
   data_tables <- lapply(1:l, function(i)
     {
@@ -120,12 +215,16 @@ if(fragments_experiment)
     data_table <- add_log_features(data_table, log_features, epsilon)
     cat("TPM fraction: ", sum(data_table$total_TPM)/1e6, "\n")
   
-    colnames(data_table)[1] <- "chr"
+    #colnames(data_table)[1] <- "chr" perchè serviva?
     data_table$cell_name <- as.factor(cell_names[i])
     data_table <- exclude_outliers(data_table, lim = 2.5e5)
+    data_table <- data_table[data_table$missing_prop<=max_missing_prop,]
     if(exclude_sex_chr)
       data_table <- exclude_sex_chromosomes(data_table)
-    data_table
+    
+    # idk if necessary
+    data_table <- data_table[!is.na(data_table$i_start),]
+    return(data_table)
     }) 
   
   remove(msr_fragments_tables); remove(rna_fragments_tables); gc()
@@ -133,6 +232,7 @@ if(fragments_experiment)
 
 if(!fragments_experiment)
 {
+  cell_names <- genes_cell_names
   msr_genes_patterns <- c("msr", "gene")
   expression_file_patterns <- c(".tsv")
   dir <- "../../Rexperiments/final/"
@@ -161,6 +261,8 @@ if(!fragments_experiment)
       #data_table <- data_table[data_table$meth_rate<0.90 & data_table$meth_rate>0.1, ]
       if(exclude_sex_chr)
         data_table <- exclude_sex_chromosomes(data_table)
+      
+      data_table <- data_table[data_table$missing_prop<=max_missing_prop,]
       data_table
     }) 
   
@@ -168,6 +270,8 @@ if(!fragments_experiment)
 }
 
 names(data_tables) <- cell_names
+
+merged_data_tables <- merge_data_tables(data_tables)
 ```
 
 
@@ -198,7 +302,13 @@ merged_model_data <- merge_model_datas(model_datas)
 ```
 
 ```{r, echo=FALSE}
-round(single_correlations_matrix(data_tables, response_variable, all_predictors),2)
+features_vs_expr_corr_matrix <- round(single_correlations_matrix(data_tables, response_variable, all_predictors),2)
+features_vs_expr_corr_matrix
+```
+
+```{r, echo=FALSE}
+cat(response_variable, "correlations:\n")
+round(correlation_matrix(data_tables, response_variable, identifier),2)
 ```
 
 ```{r, echo=FALSE}
@@ -211,6 +321,8 @@ lms <- lapply(model_datas, function(md){
   List(model=lm(formula, data = md$train_basic),
        test_data=md$test_basic)
   })
+
+#validation(100,0.8,model_datas$H1$train,function(d){lm(formula,data = d)})
 
 perf <- self_test(lms, metric)
 print(round(perf,2))
@@ -225,6 +337,7 @@ print(round(perf,2))
 
 predictors <- basic_and_advanced_predictors
 
+
 formula <- model_this(response_variable, predictors)
 lms <- lapply(model_datas, function(md){
   List(model=lm(formula, data = md$train_basic),
@@ -237,6 +350,11 @@ print(round(perf,2))
 cat("\n")
 perf <- cross_matrix_test(lms, metric)
 print(round(perf,2))
+
+cat("\ncross_matrix_test_swap_expression:\n")
+perf <- cross_matrix_test_swap_expression(lms, metric, identifier)
+print(round(perf,2))
+
 
 cat("\nMerged model:\n ")
 perf <- (test_full_model_on_cells(model = lm(formula, data=merged_model_data$train_basic), test = merged_model_data$test_basic, eval_method = metric))
@@ -270,9 +388,11 @@ print(round(perf,2))
 # model selection
 
 predictors <- all_predictors
+#lasso_lambda <- 0.2
+alpha=1
 
 models <- lapply(model_datas, function(md){
-  List(model=lasso(response_variable, md$train[,c(response_variable, predictors)], lasso_lambda),
+  List(model=lasso(response_variable, md$train[,c(response_variable, predictors)], lasso_lambda,alpha),
        test_data=md$test)
   })
 
@@ -286,7 +406,7 @@ perf <- cross_matrix_test(models, eval_f)
 print(round(perf,2))
 
 cat("\nMerged model:\n ")
-merged_lasso <- lasso(response_variable, merged_model_data$train[,c(response_variable, predictors)], lasso_lambda)
+merged_lasso <- lasso(response_variable, merged_model_data$train[,c(response_variable, predictors)], lasso_lambda,alpha)
 perf <- (test_full_model_on_cells(model = merged_lasso, test = merged_model_data$test, eval_method = eval_f))
 print(round(perf,2))
 ```
@@ -317,67 +437,236 @@ colnames(coeff_matrix) <- c(cell_names, "Merged")
 round(coeff_matrix,2)
 ```
 
+```{r, echo=FALSE}
+# model selection
+library(leaps)
+predictors <- all_predictors
+
+models <- regsubsets(model_this(response_variable, predictors), merged_model_data$train, nvmax = length(all_predictors)-3)
+  
+smm <- summary(models)
+
+print(smm)
+
+print(sqrt(smm$adjr2))
+```
+
+
 
 ```{r, echo=FALSE}
 # GRADIENT BOOSTING
 
-predictors <- basic_and_advanced_predictors
-model_data <- merged_model_data
-dtrain <- xgb.DMatrix(data = as.matrix(model_data$train_basic[, predictors]), label=as.matrix(model_data$train_basic[, response_variable]))
+predictors <- c("log_nucleotides", "CG_density", "meth_rate", "meth_autocorrelation", "mean_bernoulli_entropy", "meth_sd")
 
-dtest <- xgb.DMatrix(data = as.matrix(model_data$test_basic[, predictors]), label=as.matrix(model_data$test_basic[, response_variable]))
+if(fragments_experiment)
+  predictors <- c(basic_and_advanced_predictors, "msr", "inverted_msr", "CGsites_msr")
 
-bstDense <- xgboost(data = dtrain, nrounds = 10, objective = "reg:squarederror", verbose = F)
+######################## correct random split
+exclude_K562 <- F
+if(exclude_K562)
+  merged_data_tables <- merged_data_tables[merged_data_tables$cell_name!="K562"]
+train_prop <- 0.75
+random_split_data <- merged_data_tables[merged_data_tables$missing_prop<=0.1,]
+random_split_data <- random_split_data[complete.cases(random_split_data[,predictors]), ]
+id <- identifier
+L <- length(random_split_data[,1])
+id_vector <- unique(random_split_data[,id])
+l <- length(id_vector)
+train_size <- l*train_prop
+cell_names <- unique(random_split_data$cell_name)
 
-pred <- predict(bstDense, dtest)
-sapply(cell_names, function(cn)
-  {
-  dtest <- xgb.DMatrix(data = as.matrix(model_data$test_basic[model_data$test_basic$cell_name==cn, predictors]), label=as.matrix(model_data$test_basic[model_data$test_basic$cell_name==cn, response_variable]))
+id_train <- sample(id_vector, train_size, replace = F)
+train_rows <- which(random_split_data[,id] %in% id_train)
+test_rows = (1:L)[-train_rows]
+df_train <- random_split_data[train_rows,]
+df_test  <- random_split_data[test_rows,]
+random_split_data <- List(train=df_train,test=df_test)
 
-  pred <- predict(bstDense, dtest)
-  cor(pred, model_data$test_basic[model_data$test_basic$cell_name==cn, response_variable])
-  })
+
+########################
+
+#model_data <- merged_model_data
+model_data <- random_split_data
+
+dtrain <- xgb.DMatrix(data = as.matrix(model_data$train[, predictors]), label=as.matrix(model_data$train[, response_variable]))
+
+dtest <- xgb.DMatrix(data = as.matrix(model_data$test[, predictors]), label=as.matrix(model_data$test[, response_variable]))
 
 ```
 
 
 ```{r, echo=FALSE}
-# RANDOM FOREST ALL PREDICTORS
+# GRADIENT BOOSTING
+
+bstDense <- xgboost(data = dtrain, objective = "reg:squarederror", verbose = T, nrounds = 10, print_every_n = 50)
+
+shared_boost_result <- sapply(cell_names, function(cn)
+  {
+  dtest <- xgb.DMatrix(data = as.matrix(model_data$test[model_data$test$cell_name==cn, predictors]), label=as.matrix(model_data$test[model_data$test$cell_name==cn, response_variable]))
+
+  pred <- predict(bstDense, dtest)
+  cor(pred, model_data$test[model_data$test$cell_name==cn, response_variable])
+  })
+
+names(shared_boost_result) <- cell_names
+
+print(round(shared_boost_result,3))
+print(round((shared_boost_result)^2,3))
+
+shared_boost_importance_matrix <- xgb.importance(colnames(model_data$train[, predictors]), model = bstDense)
+
+xgb.plot.importance(shared_boost_importance_matrix, rel_to_first = TRUE, xlab = "Relative importance")
+```
+
+
+```{r, echo=FALSE}
+#xgb.plot.tree(model = bstDense)
+
+#######
+
+
+
+#(gg <- xgb.ggplot.importance(importance_matrix, measure = "Frequency", rel_to_first = TRUE))
+#gg + ggplot2::ylab("Frequency")
+
+
+# GRADIENT BOOSTING
+
+# cv <- xgb.cv(data = dtrain, nrounds = 50, nthread = 2, nfold = 5, metrics = list("rmse"),
+#                   max_depth = 3, eta = 0.3, subsample = 0.5, objective = "reg:squarederror", prediction = T, print_every_n = 10)
+# #print(cv$evaluation_log)
+# #print(cv, verbose=TRUE)
 # 
-# predictors <- basic_and_advanced_predictors
 # 
-# formula <- model_this(response_variable, predictors)
-# rfs <- lapply(model_datas, function(md){
-#   List(model=model <- randomForest(formula, data = md$train, importance = T, ntree = 10),
-#        test_data=md$test)
+# perf <- sapply(cell_names, function(cn)
+#   {
+#   pred <- cv$pred
+#   cor(pred[model_data$train$cell_name==cn], model_data$train[model_data$train$cell_name==cn, response_variable])
 #   })
 # 
-# perf <- self_test(rfs, metric)
-# print(round(perf,2))
-# cat("\nMerged model:\n ")
-# 
-# cat("\n")
-# perf <- cross_matrix_test(lms, metric)
-# print(round(perf,2))
-# 
-# rf_merged <- randomForest(formula, data = merged_model_data$train, importance = T, ntree = 10)
-# perf <- (test_full_model_on_cells(model = rf_merged, test = merged_model_data$test, eval_method = metric))
-# print(round(perf,2))
+# round(perf,3)
+
+```
+
+
+
+```{r, echo=FALSE}
+
+######### one xgboost for each cell
+
+single_boost_results <- sapply(cell_names, function(cn)
+{
+model_data <- model_datas[[cn]]
+dtrain <- xgb.DMatrix(data = as.matrix(model_data$train_basic[, predictors]), label=as.matrix(model_data$train_basic[, response_variable]))
+
+dtest <- xgb.DMatrix(data = as.matrix(model_data$test_basic[, predictors]), label=as.matrix(model_data$test_basic[, response_variable]))
+
+bstDense <- xgboost(data = dtrain, objective = "reg:squarederror", verbose = T, nrounds = 20, print_every_n = 50)
+
+r <- cor(predict(bstDense, dtest), model_data$test_basic[,response_variable])
+
+names(r) <- cn
+r
+}, USE.NAMES = T)
+
+print(single_boost_results)
+print(single_boost_results^2)
+
 ```
 
 
 
 
 
+```{r, echo=FALSE}
+
+######### one xgboost for each cell differences
+
+differential_single_boost_results <- sapply(cell_names, function(cn)
+{
+model_data <- get_difference_dataset(data_tables[[cn]], data_tables[["H1"]], response_variable, predictors, most_n_diff = 20000, id = identifier)
+
+model_data <- model_data[complete.cases(model_data),]
+model_data <- train_and_test_split(model_data,0.8,T)
+
+dtrain <- xgb.DMatrix(data = as.matrix(model_data$train[, predictors]), label=as.matrix(model_data$train[, response_variable]))
+
+dtest <- xgb.DMatrix(data = as.matrix(model_data$test[, predictors]), label=as.matrix(model_data$test[, response_variable]))
+
+bstDense <- xgboost(data = dtrain, objective = "reg:squarederror", verbose = T, nrounds = 10, print_every_n = 50)
+
+r <- cor(predict(bstDense, dtest), model_data$test[,response_variable])
+
+names(r) <- cn
+r
+}, USE.NAMES = T)
+
+print(differential_single_boost_results)
+print(differential_single_boost_results^2)
+
+```
 
 
+```{r, echo=FALSE}
+
+######### one xgboost for each cell differences
+# predictors <- c("log_nucleotides", "CG_density", "meth_rate", "meth_autocorrelation", "mean_bernoulli_entropy", "meth_sd")
+# differential_single_boost_results <- sapply(cell_names, function(cn)
+# {
+#   v <- c(predictors, identifier, response_variable)
+#   v2 <- c(identifier, response_variable)
+# model_data <- merge(data_tables[[cn]][,v], data_tables[["H1"]][,v2], by = identifier)
+# y <- paste(response_variable,".x",sep="")
+# predictors <- colnames(model_data)[! colnames(model_data) %in% c(y,identifier)]
+# 
+# model_data <- model_data[complete.cases(model_data),]
+# model_data <- train_and_test_split(model_data,0.8,T)
+# 
+# dtrain <- xgb.DMatrix(data = as.matrix(model_data$train[, predictors]), label=as.matrix(model_data$train[, y]))
+# 
+# dtest <- xgb.DMatrix(data = as.matrix(model_data$test[, predictors]), label=as.matrix(model_data$test[, y]))
+# 
+# mod <- xgboost(data = dtrain, objective = "reg:squarederror", verbose = T, nrounds = 10, print_every_n = 50)
+# 
+# r <- cor(predict(mod, dtest), model_data$test[,y])
+# 
+# names(r) <- cn
+# r
+# }, USE.NAMES = T)
+# 
+# print(round(differential_single_boost_results,2))
+# print(round(differential_single_boost_results^2,2))
+
+```
 
 
+```{r, echo=FALSE}
 
+######### one xgboost for each cell differences
+# predictors <- c("log_nucleotides", "CG_density", "meth_rate", "meth_autocorrelation", "mean_bernoulli_entropy", "meth_sd")
+# differential_single_linear_results <- sapply(cell_names, function(cn)
+# {
+#   v <- c(predictors, identifier, response_variable)
+#   v2 <- c(identifier, response_variable)
+# model_data <- merge(data_tables[[cn]][,v], data_tables[["H1"]][,v2], by = identifier)
+# y <- paste(response_variable,".x",sep="")
+# predictors <- colnames(model_data)[! colnames(model_data) %in% c(y,identifier)]
+# 
+# model_data <- model_data[complete.cases(model_data),]
+# model_data <- train_and_test_split(model_data,0.8,T)
+# 
+# 
+# 
+# mod <- lm(data = model_data$train, formula = model_this(y, predictors))
+# r <- prediction_correlation_score(mod, model_data$test)
+# names(r) <- cn
+# r
+# }, USE.NAMES = T)
+# 
+# print(round(differential_single_boost_results,2))
+# print(round(differential_single_boost_results^2,2))
 
-
-
-
+```
 
 
 

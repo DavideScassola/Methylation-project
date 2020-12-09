@@ -128,6 +128,12 @@ stochastic_binaryzer <- function(data)
 
 standard_binaryzer <- function(data) { threshold_binaryzer(data, 50)}
 
+standard_binaryzer2 <- function(data){
+  v <- data$prop
+  v[v==50] <- NA
+  v>50
+  }
+
 discard_few_reads_entries <- function(data, threshold = 1, verbose = T) 
 {
   if(verbose) cat("Missing data: ", sum(data$reads<threshold)/length(data$reads), "\n")
@@ -837,7 +843,9 @@ join_rna_and_msr_tables <- function(rna_tables, msr_tables, i)
 
 join_rna_and_msr_table <- function(rna_table, msr_table)
 {
-  df = cbind(rna_table, msr_table)
+  rna_table <- rna_table[(rna_table$end_position-rna_table$start_position)>0,]
+  msr_table <- msr_table[(msr_table$end-msr_table$start)>0,]
+  df = cbind(msr_table,rna_table)
   l = length(colnames(rna_table))
   
   df$log_tpm = log(df$total_TPM+ 1e-3)
@@ -1079,6 +1087,16 @@ get_file_names <- function(dir, patterns, full.names = F)
 # mean distance from 1 or 0
 drift <- function(x) {mean(0.5-abs(x-0.5), na.rm=T)}
 
+# coherence
+coherence <- function(x) {mean((x-0.5)^2,na.rm=T)}
+
+# coherence
+mean_Gini_impurity <- function(x) {mean(x*(1-x),na.rm=T)}
+
+# Bernoulli Entropy
+Bernoulli_entropy <- function(p) {(-p*log(p+1e-20,2)-(1-p)*log((1-p)+1e-20,2))}
+mean_be <- function(p) {mean(Bernoulli_entropy(p),na.rm=T)}
+
 tmse <- function(model, test_model_data)
 {
   y_name <- as.character(formula(model)[2])
@@ -1197,8 +1215,49 @@ show_region_meth <- function(wgbs, chromosome, start, end, prop = T, genomewide 
   }
   else
   {
-    plot(x, round(p), pch = "|", ylab = " ", main=m)
+    plot(x, round(p), pch = "|", ylab = " ", main=m, xlab="")
   }
+}
+
+show_region_meth2 <- function(wgbs, chromosome, start, end, prop = T, genomewide = F, title = NA, title_pos = -6)
+{
+  w <- wgbs[wgbs$chr == chromosome & wgbs$Cpos>=start & wgbs$Cpos<=end, ]
+  p <- w$prop/100
+  m <- length(p)
+  
+  if(m<1 | all(is.na(p)))
+    return(F)
+  
+  if(is.na(title))
+    m <- paste("CG: ", m, "  nucleotides: ", end-start, "\n", chromosome, start,"-", end)
+  else{
+    m <- title
+  }
+  #cat(p, m)
+  
+  x <- 1:length(p)
+  if(genomewide)
+    x <- w$Cpos
+  
+  if(prop)
+  {
+    plot(x, p)
+  }
+  else
+  {
+    p <- standard_binaryzer2(w)*1
+    plot(x, p, pch = "|", ylab = m, xlab="", yaxt="none")
+    axis(2, c(0,1), las=2, font=2)
+  }
+  title(m, line = title_pos)
+  
+  
+  nas <- which(is.na(p))
+  y <- rep(1, length(nas))
+  points(nas,y,pch = "|", col="gray")
+  y <- rep(0, length(nas))
+  points(nas,y,pch = "|", col="gray")
+  
 }
 
 show_gene_meth <- function(wgbs, genebody_annotation, i, prop = T, genomewide = F, margins = 0)
@@ -1206,6 +1265,13 @@ show_gene_meth <- function(wgbs, genebody_annotation, i, prop = T, genomewide = 
   g <- genebody_annotation[i,]
   print(g)
   show_region_meth(wgbs, g$chr, g$start - margins, g$end + margins, prop, genomewide)
+}
+
+show_fragment_meth <- function(wgbs, data_table, i = 1, prop = T, genomewide = F, title = NA, title_pos = -6)
+{
+  g <- data_table[i,]
+  print(g)
+  show_region_meth2(wgbs, data_table$chr[i], data_table$start[i], data_table$end[i], prop, genomewide, title, title_pos = title_pos)
 }
 
 
@@ -1354,6 +1420,16 @@ lasso <- function(response_variable_name, df, lambda = 0.01, alpha = 1)
   lambda_seq <- 10^seq(2, log(lambda,10), by = -.1)
   cv_output <- cv.glmnet(x_vars, y_var, alpha = alpha, lambda = lambda_seq, nfolds = 5, standardize = T)
   glmnet(x_vars, y_var, alpha = alpha, lambda = cv_output$lambda.min)
+}
+
+lasso_normalized_coefficients <- function(response_variable_name, df, lambda = 0.01, alpha = 1)
+{
+  x_vars <- scale(as.matrix.data.frame(df[, names(df) != response_variable_name]))
+  y_var <- scale(df[, response_variable_name])
+  lambda_seq <- 10^seq(2, log(lambda,10), by = -.1)
+  cv_output <- cv.glmnet(x_vars, y_var, alpha = alpha, lambda = lambda_seq, nfolds = 5, standardize = T)
+  m <- glmnet(x_vars, y_var, alpha = alpha, lambda = cv_output$lambda.min)
+  m$beta
 }
 
 produce_and_save_genes_msr_table <- function(wgbs_file, short_name, genebody_annotation_file, gene_type_filter = NA, na_tolerance = 0.3, no_msr = F, dir = "../../Rexperiments/")
@@ -1524,7 +1600,7 @@ produce_and_save_fragments_expression_table <- function(wgbs_file, expression_fi
 
 add_log_features <- function(data_table, names, epsilon)
 {
-  new <- log(data_table[, names]+epsilon)
+  new <- log(data_table[, names]+epsilon,2)
   colnames(new) <- paste0("log_", colnames(new))
   cbind(data_table, new)
 }
@@ -1565,7 +1641,7 @@ single_correlations <- function(data_table, response, predictors)
   sapply(predictors, function(p){cor.test(data_table[,response], data_table[,p])$estimate})
 }
 
-train_and_test_split <- function(df, train_prop, random)
+train_and_test_split <- function(df, train_prop, random, test_chr = NA)
 {
   l = length(df[,1])
   train_length = train_prop*l
@@ -1574,6 +1650,12 @@ train_and_test_split <- function(df, train_prop, random)
   {
     train_rows = sample(1:l, size = train_length, replace = F)
   } else train_rows = 1:train_length
+  
+  if(!is.na(test_chr[1]))
+  {
+    train_rows = which(!(df$chr %in% test_chr))
+    cat("\ntrain_prop:", length(train_rows)/l)
+  }
   
   test_rows = (1:l)[-train_rows]
   
@@ -1586,3 +1668,380 @@ train_and_test_split <- function(df, train_prop, random)
 # plot(v)
 # resolution_relevance_plot(calculate_relevance_resolution_vector(v, na_tolerance = 0.5, invert = T))
 # cat(df[i,]$sig, "\n", df[i,]$msr)
+
+undersample_data_frame <- function(df, n)
+{
+  df[sample(1:length(df[,1]),replace = F, size = n),]
+}
+
+msr_exp_complete <- function(wgbs, short_name, CG_window_size, msr_ecdf_file, na_tolerance = 0.4, minimum_reads=1, dir = "../../Rexperiments/")
+{
+  max_gbins <- 100
+  msr_ecdf_ref <- readRDS_if_needed(msr_ecdf_file)
+  
+  wgbs <- sum_strands(readRDS_if_needed(wgbs)); gc(verbose = F)
+  
+  fragments <- floor(length(wgbs$prop)/CG_window_size)
+  i_start <- ((0:(fragments-1))*CG_window_size)+1
+
+  binary <- wgbs$prop>=50
+  binary[wgbs$reads<minimum_reads] <- NA
+  binary[wgbs$prop==50] <- NA
+  
+  i_start <- i_start[wgbs$chr[i_start]==wgbs$chr[i_start+CG_window_size]]
+  msr_table = data.frame(i_start = i_start)
+  l <- length(i_start)
+  i_end <- i_start+CG_window_size-1
+  
+  
+  msr_table$i_end <- i_end
+  msr_table$start <- wgbs$Cpos[i_start]
+  msr_table$end <- wgbs$Cpos[i_start+CG_window_size-1]
+  msr_table$chr <- wgbs$chr[i_start]
+  msr_table$nucleotides <- msr_table$end - msr_table$start
+
+  cat("\nmsr_density...")
+  msr_table$msr_density = sapply(i_start, function(x){mean(binary[x:(x+CG_window_size-1)], na.rm = T)})
+  cat("\nmeth_rate...")
+  msr_table$meth_rate = sapply(i_start, function(x){mean(wgbs$prop[x:(x+CG_window_size-1)], na.rm = T)})/100
+  cat("\nmsr...")
+  msr_table$msr = sapply(i_start, function(x){ cat(((x-1)/CG_window_size)+1, "\n"); MSR_area(calculate_relevance_resolution_vector(binary[x:(x+CG_window_size-1)], verbose=F, na_tolerance = na_tolerance, na_values_handler = replace_nas_with_bin_prop, invert = F))})
+  cat("\ninverted_msr...")
+  msr_table$inverted_msr = sapply(i_start, function(x){ cat(((x-1)/CG_window_size)+1, "\n"); MSR_area(calculate_relevance_resolution_vector(binary[x:(x+CG_window_size-1)], verbose=F, na_tolerance = na_tolerance, na_values_handler = replace_nas_with_bin_prop, invert = T))})
+  
+  cat("\ncomputing CGsites_msr")
+  msr_table$CGsites_msr <- sapply(i_start, function(x){ cat(((x-1)/CG_window_size)+1, "\n"); w<-wgbs$Cpos[x:(x+CG_window_size-1)]; genome_MSR(w, minimum_bin_size = 2, max_gbins = max_gbins)})
+  cat("\ncomputing meth_msr")
+  msr_table$meth_msr <- sapply(i_start, function(x){ cat(((x-1)/CG_window_size)+1, "\n"); genome_MSR(wgbs$Cpos[x:(x+CG_window_size-1)][binary[x:(x+CG_window_size)]], minimum_bin_size = 2, max_gbins = max_gbins)})
+  cat("\ncomputing unmeth_msr")
+  msr_table$unmeth_msr <- sapply(i_start, function(x){ cat(((x-1)/CG_window_size)+1, "\n"); genome_MSR(wgbs$Cpos[x:(x+CG_window_size-1)][!binary[x:(x+CG_window_size)]], minimum_bin_size = 2, max_gbins = max_gbins)})
+
+  msr_table$inverted_msr[is.na(msr_table$inverted_msr)] <- msr_table$msr[is.na(msr_table$inverted_msr)]
+  msr_table$msr[is.na(msr_table$msr)] <- msr_table$inverted_msr[is.na(msr_table$msr)]
+  
+  cat("\necdf...")
+  msr_table$ecdf <- significance_measure(msr_table$msr, msr_table$msr_density, msr_ecdf_ref, inverted = F)
+  cat("\ninverted_ecdf...")
+  msr_table$inverted_ecdf <- significance_measure(msr_table$inverted_msr, msr_table$msr_density, msr_ecdf_ref, inverted = T)
+  median_function <- extract_ecdf_function(msr_ecdf_ref, 0.5)
+  cat("\nresidual...")
+  msr_table$residual <- msr_table$msr-median_function(msr_table$msr_density)
+  cat("\ninverted_residual...")
+  msr_table$inverted_residual <- msr_table$inverted_msr-median_function(1-msr_table$msr_density)
+  
+  
+  #other_stats_to_calculate <- c(autocorrelation, drift, coherence, meth_sd, missing_prop)
+  cat("\nmeth_autocorrelation...")
+  msr_table$meth_autocorrelation <- sapply(i_start, function(x){autocorrelation(wgbs$prop[x:(x+CG_window_size-1)])})
+  cat("\nmean_drift...")
+  msr_table$mean_drift <- sapply(i_start, function(x){drift(wgbs$prop[x:(x+CG_window_size-1)]/100)})
+  cat("\nmeth_sd...")
+  msr_table$meth_sd <- sapply(i_start, function(x){sd(wgbs$prop[x:(x+CG_window_size-1)]/100, na.rm=T)})
+  cat("\nmissing_prop...")
+  msr_table$missing_prop <- sapply(i_start, function(x){mean(is.na(binary[x:(x+CG_window_size-1)]))})
+  cat("\nmean_bernoulli_entropy ...")
+  msr_table$mean_bernoulli_entropy <- sapply(i_start, function(x){mean_be(wgbs$prop[x:(x+CG_window_size-1)]/100)})
+  
+  # save msr tables
+  #msr_table = data.frame(i_start,msr_density,meth_rate,msr,inverted_msr, ecdf, inverted_ecdf, residual, inverted_residual, meth_autocorrelation, drift = mean_drift, meth_sd, missing_prop)
+  saveRDS(msr_table, file = paste(dir,short_name, "_msr_complete_experimental_table_", CG_window_size, ".Rda", sep = ""))
+}
+
+ggplot_meth_fragment <- function(wgbs, i_start, size, prop=T,genomewide=F, minimum_reads=1, loess_span = NA)
+{
+  logit <- function(p){log(p/(1-p))}
+  epsilon <- 1e-3
+  
+  fragment <- wgbs[i_start:(i_start+size-1),]
+  fragment$x <- 1:size
+  xscale <- "CpG index"
+  yscale <- "meth prop"
+  if(genomewide)
+  {
+    xscale <- "nucleotide position"
+    fragment$x <- fragment$Cpos
+  }
+  
+  fragment$prop <- fragment$prop/100; fragment$prop[fragment$prop==0] <- epsilon; fragment$prop[fragment$prop==1] <- 1-epsilon
+  fragment <- fragment[fragment$reads>=minimum_reads, ]
+  
+  if(!prop)
+  {
+    fragment<-fragment[fragment$prop!=0.5,]
+    fragment$prop<-(fragment$prop>0.5)+0
+    yscale <- "meth state"
+  }
+    
+  
+  if(!is.na(loess_span))
+    model <- loess(logit(prop) ~ x, data = fragment, span = loess_span)
+  else{
+    model <- gam(logit(prop) ~ s(x), data = fragment, gamma = 0)
+  }
+
+  
+  fragment$fit <- sigmoid(predict(model, type="response"))
+  
+  pl <- ggplot(data=fragment, aes(x = x, y = fit), alpha = 0.9) +
+    geom_point(data=fragment, aes(x = x, y = prop), alpha=0.5)+
+    geom_line(data=fragment, aes(x = x, y = fit), alpha = 0.9, color = "blue")+
+    ylim(0,1)+
+    ylab(yscale)+
+    xlab(xscale)
+  
+  return(pl)
+}
+
+methylation_summary_feature <- function(stat, data_table, wgbs)
+{
+  wgbs <- sum_strands(wgbs)
+  wgbs$prop <- wgbs$prop/100
+  if(! "i_end" %in% colnames(data_table)) # for fragments when
+    data_table$i_end <- data_table$i_start + (data_table$i_start[2]-data_table$i_start[1])-1
+  sapply(1:length(data_table$i_start), function(i) {
+    if(is.na(data_table$i_start[i]+data_table$i_end[i])) return(NA)
+    stat( wgbs$prop[data_table$i_start[i]:data_table$i_end[i]] )
+    })
+}
+
+add_feature_to_table <- function(data_file, relative_wgbs, stat, stat_name)
+{
+  data_table <- readRDS(data_file)
+  wgbs <- sum_strands(readRDS_if_needed(relative_wgbs))
+  data_table[,stat_name] <- methylation_summary_feature(stat, data_table, wgbs)
+  saveRDS(data_table,file=data_file)
+}
+
+
+
+
+gg_expression_scatterplot <- function(data_table, xname, yname, response_variable, undersample = NA, points_alpha = 1, title="")
+{
+  c1 <- '#666699'
+  c2 <- '#00b300'
+  
+  if(!is.na(undersample))
+    data_table <- undersample_data_frame(data_table, undersample)
+  
+  df <- data.frame(x=data_table[,xname], y=data_table[,yname], ltpm=data_table[,response_variable])
+  df <- df[complete.cases(df),]
+  #data_table <- data_table[,c(xname, yname, response_variable)]
+  ggplot(df, aes(x, y, color=ltpm)) +
+    geom_point(alpha = points_alpha) +
+    scale_colour_gradient(low = c1, high = "green", na.value = NA, name = response_variable) +
+    theme(legend.position=c(0,1), legend.justification=c(0,1)) +
+    labs(x = xname, y=yname, title = title)
+  
+  
+}
+
+ggplot_meth_fragment_comparison <- function(wgbs1, wgbs2, table, i,prop=T,genomewide=F, minimum_reads=1, loess_span = NA)
+{
+  table <- table[i,]
+  i_start <- table$i_start
+  size <- table$i_end - table$i_start
+  
+  p1 <- ggplot_meth_fragment(wgbs1, i_start, size, prop,genomewide, minimum_reads, loess_span)
+  p2 <- ggplot_meth_fragment(wgbs2, i_start, size, prop,genomewide, minimum_reads, loess_span)
+  
+  grid.arrange(p1,p2,nrow=2)
+  print(table)
+}
+
+
+change.notation <- Vectorize(function(ss)
+{
+  original <- substr(ss,nchar("inverted_")+1,nchar(ss))
+  return(paste(original, "(0)", sep=""))
+}, USE.NAMES = F)
+
+correct.names <- function(fnames)
+{
+  if(nn)
+    grepl("inverted", "inverted_msr")
+  substr("inverted_msr",nchar("inverted_")+1,nchar("inverted_msr"))
+}
+
+validation <- function(n,train_prop,data,lambda_model,evaluation_metric=tmse)
+{
+  sapply(1:n, function(i)
+  {
+    df <- train_and_test_split(data,train_prop,random = T)
+    model <- lambda_model(df$train)
+    evaluation_metric(model, df$test)
+  })
+}
+
+
+from_table_to_data_frame <- function(M, label=NA, label_names=NA)
+{
+  l <- prod(dim(M))
+
+  rn <- rownames(M)
+  dffs <- lapply(rn, function(r)
+  {
+    dff <- data.frame(result=M[r,])
+    dff$name <- r
+    dff
+  })
+  
+  df <- dffs[[1]]
+  for(i in 2:length(dffs))
+  {
+    df <- rbind(df,dffs[[i]])
+  }
+  
+  if(!is.na(label[1]))
+  {
+    for(i in 1:length(label))
+      df[, label_names[i]] = as.factor(label[i])
+  }
+    
+  
+  df$name = as.factor(df$name)
+  df
+}
+
+validation_on_subsets <- function(n,train_prop,data,lambda_model,evaluation_metric=tmse, id, merged)
+{
+  L <- length(data[,1])
+  id_vector <- unique(data[,id])
+  l <- length(id_vector)
+  train_size <- l*train_prop
+  cell_names <- unique(data$cell_name)
+  M <- sapply(1:n, function(i)
+  {
+    id_train <- sample(id_vector, train_size, replace = F)
+    train_rows <- which(data[,id] %in% id_train)
+    test_rows = (1:L)[-train_rows]
+    df_train <- data[train_rows,]
+    df_test  <- data[test_rows,]
+    
+    
+    sapply(cell_names, function(cn)
+    {
+      if(merged)
+        model <- lambda_model(df_train)
+      else model <- lambda_model(df_train[df_train$cell_name==cn,])
+      evaluation_metric(model, df_test[df_test$cell_name==cn,])
+    })
+  })
+  
+  rownames(M) <- cell_names
+  M
+  
+}
+
+validation_on_subsets_data_frame <- function(n,train_prop,data,lambda_model,evaluation_metric=tmse, id, label=NA, label_name="model")
+{
+  M_single <- validation_on_subsets(n,train_prop,data,lambda_model,evaluation_metric, id, merged=F)
+  M_merged <- validation_on_subsets(n,train_prop,data,lambda_model,evaluation_metric, id, merged=T)
+  
+  d1 <- from_table_to_data_frame(M_single, label="single", label_names="type")
+  d2 <- from_table_to_data_frame(M_merged, label="shared", label_names="type")
+  df <- rbind(d1,d2)
+  
+  if(!is.na(label))
+    df[,label_name] <- as.factor(label)
+  
+  return(df)
+    
+}
+  
+
+table_to_frame <- function(M,cnames=NA)
+{
+  l <- prod(dim(M))
+  r <- array(dim = l)
+  c <- array(dim = l)
+  v <- array(dim = l, data = 0.1)
+  df <- data.frame(v,r,c)
+  
+  i = 1
+  
+  for(cl in colnames(M))
+  {
+    for(rw in rownames(M))
+    {
+      df[i,"v"] <- M[rw,cl]
+      df[i,"r"] <- rw
+      df[i,"c"] <- cl
+      i <- i+1
+    }
+  }
+  
+  df$r = as.factor(df$r)
+  df$c = as.factor(df$c)
+  if(!is.na(cnames[1]))
+    colnames(df)<-cnames
+  
+  return(df)
+}
+  
+
+
+ggplot_meth_fragment2 <- function(wgbs, table_row, prop=T,genomewide=F, minimum_reads=1, loess_span = NA)
+{
+  i_start <- table_row$i_start
+  size <- table_row$i_end - table_row$i_start - 1
+  ggplot_meth_fragment(wgbs, i_start, size, prop,genomewide, minimum_reads, loess_span)
+    
+}
+
+columns_intersection <- function(data_tables, cname)
+{
+   c <- data_tables[[1]][,cname]
+  for(i in 2:length(data_tables))
+  {
+    c <- intersect(c, data_tables[[i]][,cname])
+  }
+   c
+}
+
+same_ids_datasets <- function(data_tables, idname)
+{
+  ids <- columns_intersection(data_tables, idname)
+
+  lapply(data_tables, function(d){d[d[,idname] %in% ids,]})
+}
+
+q_norm <- function(x)
+{
+  x[order(x)]<-(1:length(x))
+  x/length(x)
+}
+
+cross_tissues_cor <- function(data_tables, xn, yn, id, cor_method = "spearman")
+{
+  dts <- lapply(data_tables, function(d) {d[complete.cases(d[,c(xn,yn)]),]} )
+  dts <- same_ids_datasets(dts, id)
+  
+  Mx <- (as.matrix.data.frame(sapply(dts, function(d) {d[,xn]} ) ))
+  My <- scale(as.matrix.data.frame(sapply(dts, function(d) {d[,yn]} ) ))
+  
+  # rank normalization
+  for(i in 1:length(Mx[1,]))
+      My[,i] <- q_norm(My[,i])
+  
+  sds <- sapply(1:length(Mx[,1]), function(i) {sd(My[i,])})
+
+  r <- sapply(1:length(Mx[,1]), function(i){
+    cor(Mx[i,],My[i,],method = cor_method)
+    })
+  
+  data.frame(r=r[order(-sds)],sds)
+}
+    
+gg_CpG_density <- function(wgbs, table_row)
+{
+  data <- data.frame(x=wgbs$Cpos[table_row$i_start:(table_row$i_start+999)])
+  ggplot(data, aes(x=x)) +
+    geom_density(adjust=1, alpha=.4, fill="gray")+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 10))
+}
+
+MSR_CpG_visualization <- function(wgbs, table_row)
+{
+  x = wgbs$Cpos[table_row$i_start:(table_row$i_start+999)]
+  MSR_visualization(x)
+}
