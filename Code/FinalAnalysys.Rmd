@@ -14,7 +14,6 @@ knitr::opts_chunk$set(echo = TRUE)
 library(ggfortify)
 library(randomForest)
 library(xgboost)
-#library(tidyverse)
 library("PerformanceAnalytics")
 source("WGBS_analysis_functions.R", chdir = T)
 ```
@@ -141,6 +140,8 @@ differential_correlations_analysys <- function(difference_dataset, response_vari
 
 ```{r, include=FALSE}
 fragments_experiment <- T
+# F -> gene bodies
+# T -> fragments
 ```
 
 ```{r, include=FALSE}
@@ -348,12 +349,12 @@ perf <- self_test(lms, metric)
 print(round(perf,2))
 
 cat("\n")
-perf <- cross_matrix_test(lms, metric)
-print(round(perf,2))
+# perf <- cross_matrix_test(lms, metric)
+# print(round(perf,2))
 
-cat("\ncross_matrix_test_swap_expression:\n")
-perf <- cross_matrix_test_swap_expression(lms, metric, identifier)
-print(round(perf,2))
+# cat("\ncross_matrix_test_swap_expression:\n")
+# perf <- cross_matrix_test_swap_expression(lms, metric, identifier)
+# print(round(perf,2))
 
 
 cat("\nMerged model:\n ")
@@ -376,8 +377,8 @@ perf <- self_test(lms, metric)
 print(round(perf,2))
 
 cat("\n")
-perf <- cross_matrix_test(lms, metric)
-print(round(perf,2))
+# perf <- cross_matrix_test(lms, metric)
+# print(round(perf,2))
 
 cat("\nMerged model:\n ")
 perf <- (test_full_model_on_cells(model = lm(formula, data=merged_model_data$train), test = merged_model_data$test, eval_method = metric))
@@ -402,8 +403,8 @@ perf <- self_test(models, eval_f)
 print(round(perf,2))
 
 cat("\n")
-perf <- cross_matrix_test(models, eval_f)
-print(round(perf,2))
+# perf <- cross_matrix_test(models, eval_f)
+# print(round(perf,2))
 
 cat("\nMerged model:\n ")
 merged_lasso <- lasso(response_variable, merged_model_data$train[,c(response_variable, predictors)], lasso_lambda,alpha)
@@ -439,16 +440,16 @@ round(coeff_matrix,2)
 
 ```{r, echo=FALSE}
 # model selection
-library(leaps)
-predictors <- all_predictors
-
-models <- regsubsets(model_this(response_variable, predictors), merged_model_data$train, nvmax = length(all_predictors)-3)
-  
-smm <- summary(models)
-
-print(smm)
-
-print(sqrt(smm$adjr2))
+# library(leaps)
+# predictors <- all_predictors
+# 
+# models <- regsubsets(model_this(response_variable, predictors), merged_model_data$train, nvmax = length(all_predictors)-3)
+# 
+# smm <- summary(models)
+# 
+# print(smm)
+# 
+# print(sqrt(smm$adjr2))
 ```
 
 
@@ -519,36 +520,6 @@ xgb.plot.importance(shared_boost_importance_matrix, rel_to_first = TRUE, xlab = 
 ```
 
 
-```{r, echo=FALSE}
-#xgb.plot.tree(model = bstDense)
-
-#######
-
-
-
-#(gg <- xgb.ggplot.importance(importance_matrix, measure = "Frequency", rel_to_first = TRUE))
-#gg + ggplot2::ylab("Frequency")
-
-
-# GRADIENT BOOSTING
-
-# cv <- xgb.cv(data = dtrain, nrounds = 50, nthread = 2, nfold = 5, metrics = list("rmse"),
-#                   max_depth = 3, eta = 0.3, subsample = 0.5, objective = "reg:squarederror", prediction = T, print_every_n = 10)
-# #print(cv$evaluation_log)
-# #print(cv, verbose=TRUE)
-# 
-# 
-# perf <- sapply(cell_names, function(cn)
-#   {
-#   pred <- cv$pred
-#   cor(pred[model_data$train$cell_name==cn], model_data$train[model_data$train$cell_name==cn, response_variable])
-#   })
-# 
-# round(perf,3)
-
-```
-
-
 
 ```{r, echo=FALSE}
 
@@ -561,7 +532,7 @@ dtrain <- xgb.DMatrix(data = as.matrix(model_data$train_basic[, predictors]), la
 
 dtest <- xgb.DMatrix(data = as.matrix(model_data$test_basic[, predictors]), label=as.matrix(model_data$test_basic[, response_variable]))
 
-bstDense <- xgboost(data = dtrain, objective = "reg:squarederror", verbose = T, nrounds = 20, print_every_n = 50)
+bstDense <- xgboost(data = dtrain, objective = "reg:squarederror", verbose = F, nrounds = 20)
 
 r <- cor(predict(bstDense, dtest), model_data$test_basic[,response_variable])
 
@@ -575,14 +546,11 @@ print(single_boost_results^2)
 ```
 
 
-
-
-
 ```{r, echo=FALSE}
 
 ######### one xgboost for each cell differences
 
-differential_single_boost_results <- sapply(cell_names, function(cn)
+differential_single_boost_results <- sapply(cell_names[cell_names!="H1"], function(cn)
 {
 model_data <- get_difference_dataset(data_tables[[cn]], data_tables[["H1"]], response_variable, predictors, most_n_diff = 20000, id = identifier)
 
@@ -593,7 +561,7 @@ dtrain <- xgb.DMatrix(data = as.matrix(model_data$train[, predictors]), label=as
 
 dtest <- xgb.DMatrix(data = as.matrix(model_data$test[, predictors]), label=as.matrix(model_data$test[, response_variable]))
 
-bstDense <- xgboost(data = dtrain, objective = "reg:squarederror", verbose = T, nrounds = 10, print_every_n = 50)
+bstDense <- xgboost(data = dtrain, objective = "reg:squarederror", verbose = F, nrounds = 10, print_every_n = 50)
 
 r <- cor(predict(bstDense, dtest), model_data$test[,response_variable])
 
@@ -605,69 +573,3 @@ print(differential_single_boost_results)
 print(differential_single_boost_results^2)
 
 ```
-
-
-```{r, echo=FALSE}
-
-######### one xgboost for each cell differences
-# predictors <- c("log_nucleotides", "CG_density", "meth_rate", "meth_autocorrelation", "mean_bernoulli_entropy", "meth_sd")
-# differential_single_boost_results <- sapply(cell_names, function(cn)
-# {
-#   v <- c(predictors, identifier, response_variable)
-#   v2 <- c(identifier, response_variable)
-# model_data <- merge(data_tables[[cn]][,v], data_tables[["H1"]][,v2], by = identifier)
-# y <- paste(response_variable,".x",sep="")
-# predictors <- colnames(model_data)[! colnames(model_data) %in% c(y,identifier)]
-# 
-# model_data <- model_data[complete.cases(model_data),]
-# model_data <- train_and_test_split(model_data,0.8,T)
-# 
-# dtrain <- xgb.DMatrix(data = as.matrix(model_data$train[, predictors]), label=as.matrix(model_data$train[, y]))
-# 
-# dtest <- xgb.DMatrix(data = as.matrix(model_data$test[, predictors]), label=as.matrix(model_data$test[, y]))
-# 
-# mod <- xgboost(data = dtrain, objective = "reg:squarederror", verbose = T, nrounds = 10, print_every_n = 50)
-# 
-# r <- cor(predict(mod, dtest), model_data$test[,y])
-# 
-# names(r) <- cn
-# r
-# }, USE.NAMES = T)
-# 
-# print(round(differential_single_boost_results,2))
-# print(round(differential_single_boost_results^2,2))
-
-```
-
-
-```{r, echo=FALSE}
-
-######### one xgboost for each cell differences
-# predictors <- c("log_nucleotides", "CG_density", "meth_rate", "meth_autocorrelation", "mean_bernoulli_entropy", "meth_sd")
-# differential_single_linear_results <- sapply(cell_names, function(cn)
-# {
-#   v <- c(predictors, identifier, response_variable)
-#   v2 <- c(identifier, response_variable)
-# model_data <- merge(data_tables[[cn]][,v], data_tables[["H1"]][,v2], by = identifier)
-# y <- paste(response_variable,".x",sep="")
-# predictors <- colnames(model_data)[! colnames(model_data) %in% c(y,identifier)]
-# 
-# model_data <- model_data[complete.cases(model_data),]
-# model_data <- train_and_test_split(model_data,0.8,T)
-# 
-# 
-# 
-# mod <- lm(data = model_data$train, formula = model_this(y, predictors))
-# r <- prediction_correlation_score(mod, model_data$test)
-# names(r) <- cn
-# r
-# }, USE.NAMES = T)
-# 
-# print(round(differential_single_boost_results,2))
-# print(round(differential_single_boost_results^2,2))
-
-```
-
-
-
-

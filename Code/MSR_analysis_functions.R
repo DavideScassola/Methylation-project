@@ -3,33 +3,8 @@ suppressMessages(library(pracma))
 suppressMessages(library(parallel))
 suppressMessages(library(scales))
 
-calculate_relevance_from_counts <- function(counts, M=NA)
-{
-  if(is.na(M))
-    M <- sum(counts) #efficiency ?
-  m_k <- tabulate(counts+1)
-  k <- 0:(length(m_k)-1)
-  
-  p <- (k*m_k)/M
-  return(-sum(p*log(p+1E-20, M)))
-}
 
-calculate_resolution_from_counts_old <- function(counts, M=NA)
-{
-  if(is.na(M))
-    M <- sum(counts)
-  p <- counts/M
-  return(-sum(p*(log(counts+1E-20,base = M)-1)))
-}
-
-calculate_resolution_from_counts <- function(counts, M=NA)
-{
-  if(is.na(M))
-    M <- sum(counts)
-  p <- counts[counts>0]/M
-  #return(-sum(p*(log(counts+1E-20,base = M)-1)))
-  return(-sum(p*log(p,base = M)))
-}
+# MSR CALCULATION
 
 efficient_resolution_relevance_from_counts <- function(counts, M=NA)
 {
@@ -47,8 +22,6 @@ efficient_resolution_relevance_from_counts <- function(counts, M=NA)
 
 meth_prop <- function(meth_vector)
 {
-  #valid_meth <- meth_vector[!is.na(meth_vector)]
-  #sum(valid_meth)/length(valid_meth)
   mean(meth_vector,na.rm=T)
 }
 
@@ -109,16 +82,13 @@ corrected_cumsum <- function(vector)
   return(c)
 }
 
-# PLEASE USE A SPARSE MATRIX IF POSSIBLE
+# PLEASE USE A SPARSE VECTOR IF POSSIBLE
 calculate_relevance_and_resolution_ignoring_nas <- function(cumulative_sum_vector, bin_size) 
 {
   #s<-Sys.time(); 
   l <- length(cumulative_sum_vector)-1
-  #if(bin_size==1) return(c(0,1,1,1))
-  #print(bin_size)
   if(bin_size==l) return(c(0,0,l,NA))
   
-  #starting_points <- ((1:ceiling(l/bin_size))*bin_size)-bin_size+1
   starting_points <- seq(from = 1, to = l, by = bin_size)
   #cat("pre:", Sys.time()-s); s<-Sys.time(); 
   counts  <-  cumulative_sum_vector[pmin(starting_points+bin_size, l+1)]-cumulative_sum_vector[starting_points]
@@ -131,18 +101,11 @@ calculate_relevance_and_resolution_ignoring_nas <- function(cumulative_sum_vecto
   }
 
   M <- cumulative_sum_vector[l+1]
-  #relevance <- calculate_relevance_from_counts(counts, M)
-  #cat("rel:", Sys.time()-s); s<-Sys.time();
-  #resolution <- calculate_resolution_from_counts(counts, M)
-  #cat("res:", Sys.time()-s); s<-Sys.time();
   return(c(efficient_resolution_relevance_from_counts(counts, M), bin_size, 1))
 }
 
-
-calculate_relevance_and_resolution <- function(methylation_vector, cumulative_sum_vector, cumulative_na_vector, bin_size, na_tolerance, no_data_out = F, na_values_handler, verbose = T, throw_away_threshold = 0) 
+calculate_relevance_and_resolution <- function(methylation_vector, cumulative_sum_vector, cumulative_na_vector, bin_size, na_tolerance, na_values_handler, verbose = T, throw_away_threshold = 0) 
 {
-  # cumulative_sum_vector[end]-cumulative_sum_vector[start]=sum(methylation_vector[start:(end-1)])
-  
   l <- length(methylation_vector)
   data_size <- l-cumulative_na_vector[l+1]
   cumulative_vector_length <- length(cumulative_sum_vector)
@@ -178,27 +141,17 @@ calculate_relevance_and_resolution <- function(methylation_vector, cumulative_su
   effective_data <- (bin_size*valid_bins_found)/data_size
   if(effective_data<throw_away_threshold) return(c(NA,NA,bin_size, effective_data))
 
-  #cat("ciao\n")
   effective_counts_and_na <- counts_and_na[, 1:(valid_bins_found),drop=F]
 
   # na values handling
   effective_counts <- na_values_handler(effective_counts_and_na, bin_size, methylation_vector)
-
-  
-  if(no_data_out)
-  {
-    effective_counts <- counts_and_na[1, 1:(valid_bins_found+1)]
-    # adding to counts the "bin" including all excluded observation
-    effective_counts[valid_bins_found+1] = cumulative_sum_vector[l+1]-sum(effective_counts[1:valid_bins_found])
-  }
-  
 
   if(verbose) cat("bin_size:", bin_size, " valid_bins_found:", valid_bins_found, "effective data:", (bin_size*valid_bins_found)/data_size, "\n")
 
   return(c(efficient_resolution_relevance_from_counts(effective_counts), bin_size, effective_data))
 }
 
-
+# provides log-spaced discrete bin sizes that divide with a small remainder the given space of sze n
 good_bin_sizes <- function(n, max_bins = 100, losing_data_prop = 0.1)
 {
   start <- 1
@@ -216,8 +169,8 @@ good_bin_sizesV2 <- function(n, max_bins = 100, losing_data_prop = NA)
   return(unique(round((exp(linspace(log(1), log(n), n = max_bins))))))
 }
 
-
-calculate_relevance_resolution_vector <- function(methylation_vector, na_tolerance = 0, max_bins = 100, no_data_out = F, na_values_handler = replace_nas_hybrid, invert = F, verbose = T)
+# calculates for a set of discrete bin sizes the relevance and resolution of a given already binned vector. it could include nas (missing values).
+calculate_relevance_resolution_vector <- function(methylation_vector, na_tolerance = 0, max_bins = 100, na_values_handler = replace_nas_with_bin_prop, invert = F, verbose = T)
 {
   if(invert) methylation_vector <- !methylation_vector
   
@@ -236,7 +189,7 @@ calculate_relevance_resolution_vector <- function(methylation_vector, na_toleran
   
   return(sapply(bin_sizes, function(x) 
   { 
-    calculate_relevance_and_resolution(methylation_vector, cumulative_sum_vector, cumulative_nas_vector, x, na_tolerance =na_tolerance , no_data_out = no_data_out, na_values_handler = na_values_handler, verbose = verbose)
+    calculate_relevance_and_resolution(methylation_vector, cumulative_sum_vector, cumulative_nas_vector, x, na_tolerance =na_tolerance, na_values_handler = na_values_handler, verbose = verbose)
   }))
 }
 
@@ -251,6 +204,7 @@ add_max_resolution_point_if_needed <- function(rr)
   x
 }
 
+# same as "calculate_relevance_resolution_vector" but ignores nas (missing values) replacing them with zeros.
 calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vector, max_bins = 100, verbose = T, minimum_bin_size = 1, invert = F)
 {
   if(invert) methylation_vector <- !methylation_vector
@@ -286,28 +240,6 @@ calculate_relevance_resolution_vector_ignoring_nas <- function(methylation_vecto
   return(out)
 }
 
-calculate_relevance_resolution_vector_with_positions <- function(positions, max_bins = 100, verbose = T, pre_binning = 1)
-{
-  start_time <- Sys.time()
-  l <- length(positions)
-  pre_binned <- hist(positions,breaks = l/(pre_binning), plot = F)$counts
-  bin_sizes <- good_bin_sizes(length(pre_binned), max_bins)
-
-  if(verbose) cat("Calculating cumulative sum vector \n")
-  cumulative_sum_vector <- corrected_cumsum(pre_binned)
-  
-  out <- (sapply(bin_sizes, function(x) 
-  { 
-    if(verbose) cat(x, "...\n")
-    calculate_relevance_and_resolution_ignoring_nas(cumulative_sum_vector, bin_size = x)
-  }))
-  
-  end_time <- Sys.time()
-  if(verbose) print(end_time-start_time)
-  
-  return(out)
-}
-
 genome_MSR <- function(methylation_positions, minimum_bin_size = 1, verbose = F, invert = F, msr = T, max_gbins = 100, max_bins = 1e6)
 {
   methylation_positions <- na.omit(methylation_positions)
@@ -324,7 +256,7 @@ genome_MSR <- function(methylation_positions, minimum_bin_size = 1, verbose = F,
   return(rr)
 }
 
-
+# calculates MSR on a set of positions 
 positions_MSR <- function(positions, discretization_bin_size = NA, verbose = F, msr = T, max_bins = 1e6, discrete = F,  max_gbins = 100, timing = F)
 {
   if(timing)
@@ -356,10 +288,12 @@ positions_MSR <- function(positions, discretization_bin_size = NA, verbose = F, 
   }    
 
   if(timing)
+  {
     cat("\n precomp time: ", Sys.time()-tim)
-  
-  if(timing)
     s <- Sys.time(); 
+  }
+
+  
   rr <- calculate_relevance_resolution_vector_ignoring_nas(v, minimum_bin_size = minimum_bin_size, verbose = verbose,  max_bins = max_gbins)
   
   if(timing)
@@ -367,15 +301,9 @@ positions_MSR <- function(positions, discretization_bin_size = NA, verbose = F, 
   
   if(msr)
     return(MSR_area(rr))
-  cat(MSR_area(rr))
+  if(verbose)
+    cat(MSR_area(rr))
   return(rr)
-}
-
-
-# supposing resolution is in decreasing order
-MSR_area<- function(rr_vector, M_correction = 10)
-{
-  return(trapz(x = rev(rr_vector[2,]), y = rev(rr_vector[1,]))*log10(M_correction))
 }
 
 MSR_area<- function(rr_vector)
@@ -389,9 +317,47 @@ calculate_MSR_area<- function(v)
   MSR_area(calculate_relevance_resolution_vector_ignoring_nas(v, verbose = F))
 }
 
+correct_positions_MSR <- function(positions, msr = T, max_bins = 1e6, max_gbins = 100, timing = F)
+{
+  if(timing)
+    tim <- Sys.time(); 
+  
+  if(length(positions)<2) return(NA)
+  positions <- positions[!is.na(positions)]
+  positions <- sort.default(positions)
+  a <- min(positions)
+  b <- max(positions)
+  
+  minimum_bin_size <- max(((b-a)/max_bins), min(positions[2:length(positions)]-positions[1:(length(positions)-1)]) )
+  minimum_bin_size <- min(minimum_bin_size, ((b-a)/100))
+  gbins <- rev(good_bin_sizesV2(round((b-a)/minimum_bin_size), max_gbins))
+  #gbins <- gbins(0,gbins)
+  
+  if(timing)
+    cat("\n precomp time: ", Sys.time()-tim)
+  
+  if(timing)
+    s <- Sys.time(); 
+  rr <- sapply(gbins, function(bins){
+    c <- hist(positions, plot = F, breaks = linspace(a,b,bins+1))$counts
+    c(efficient_resolution_relevance_from_counts(c), bins, 1)
+  })
+  
+  rr <- add_max_resolution_point_if_needed(rr)
+  
+  if(timing)
+    cat("\n calculation time: ", Sys.time()-s, "\n")
+  
+  if(msr)
+    return(MSR_area(rr))
+  cat(MSR_area(rr))
+  return(rr)
+}
 
-############################### PLOT FUNCTIONS ###############################
+#####################################################
 
+
+# PLOT FUNCTIONS 
 resolution_relevance_plot <- function(relevance_resolution_vector, color = rgb(0, 200, 50, maxColorValue = 255), plotter = plot, area_alpha = 0.5)
 {
   ord = order(relevance_resolution_vector[2,])
@@ -517,21 +483,92 @@ rr_plots <- function(rr_list, title = "", legend_names = "", threshold = 0.05)
 }
 
 
+# more recent functions
 
-
-############################### AUX FUNCTIONS ###############################
-
-get_max_information_vector <- function(size)
-{
-  probs = rep_len(0, size)
-  n = floor(sqrt(size))
-  for(i in 1:n)
-  {
-    probs[(1+((i-1)*n)):(i*n)] = 1/i
-  }
-
-  return(rbinom(n = size, size = 1, prob = probs))
+plot_positions <- function(positions)
+{ 
+  positions <- positions-min(positions)
+  plot(x = c(0, 1), y = c(0,0), col = alpha(1, 0.4), ylab = "", xlab = "Positions", type = "l", yaxt='n')
+  points(x = positions/max(positions), y=array(data = 0, dim = length(positions)), pch = "|", ylab = "")
 }
+
+MSR_example <- function(positions, perturb = 0, max_gbins = 50)
+{
+  if(perturb)
+  {
+    s <- sort(positions)
+    sd <- mean(s[2:length(s)]-s[1:(length(s)-1)])*perturb
+    positions <- s + rnorm(length(s), sd = sd)
+  }
+  
+  rr <- positions_MSR(positions, msr = F, max_gbins = max_gbins)
+  msr <- MSR_area(rr)
+  par(mfrow=c(1,2))
+  plot_positions(positions - min(positions))
+  resolution_relevance_plot(rr)
+  title(paste("MSR:", round(msr, digits = 3)))
+}
+
+MSR_visualization <- function(positions, discretization_bin_size = NA, perturb = 0, max_bins = 1e6, maxg_bins = 50)
+{
+  if(perturb)
+  {
+    s <- sort(positions)
+    sd <- mean(s[2:length(s)]-s[1:(length(s)-1)])*perturb
+    positions <- s + rnorm(length(s), sd = sd)
+  }
+  
+  rr <- positions_MSR(positions, discretization_bin_size, F, F, max_bins = max_bins, max_gbins = maxg_bins)
+  msr <- MSR_area(rr)
+  resolution_relevance_plot(rr)
+  title(paste("MSR:", round(msr, digits = 4)))
+}
+
+rr_curve_comparison <- function(v_list, legend_names, add_msr = T, discrete = F, max_gbins = 20)
+{
+  rr_list <- lapply(v_list, function(x)
+  {
+    positions_MSR(x, max_bins = 1e6, discrete = discrete, max_gbins = max_gbins, msr = F)
+  })
+  
+  
+  msr_list <- sapply(rr_list, MSR_area)
+  
+  if(add_msr)
+    legend_names <- as.character(sapply(1:length(legend_names), function(i){paste(legend_names[i], round(msr_list[i],3), sep = ": ")}))
+  
+  ord <- order(msr_list, decreasing = T)
+  
+  plotter = plot
+  for(i in ord)
+  {
+    resolution_relevance_plot(rr_list[[i]], alpha(i+1, 0.5), plotter, area_alpha = 0.1)
+    plotter = points
+  }
+  
+  legend("topleft", legend=legend_names[ord], col=ord+1, y.intersp = 1, cex = 1.1, bty = "n", fill=ord+1, x.intersp = 0.3)
+  
+}
+
+correct_MSR_visualization <- function(positions, discretization_bin_size = NA, perturb = 0, max_bins = 1e6, maxg_bins = 50)
+{
+  if(perturb)
+  {
+    s <- sort(positions)
+    sd <- mean(s[2:length(s)]-s[1:(length(s)-1)])*perturb
+    positions <- s + rnorm(length(s), sd = sd)
+  }
+  
+  rr <- correct_positions_MSR(positions, msr = F, max_bins, maxg_bins)
+  msr <- MSR_area(rr)
+  resolution_relevance_plot(rr)
+  title(paste("MSR:", round(msr, digits = 4)))
+}
+
+#####################################################
+
+
+# AUX FUNCTIONS
 
 mutilated <- function(v, missing_proportion)
 {
@@ -542,37 +579,54 @@ mutilated <- function(v, missing_proportion)
   return(m)
 }
 
-nameof <- function(v1) {
-  deparse(substitute(v1))
-}
-
-missing_data_experiment <- function(full_vector, missing_data_rates = c(0,0.1,0.2,0.5,0.7,0.9), max_bins = 100, no_data_out = F, na_values_handler, info = "", na_tolerance = 0)
+filter_odd_position_values <- function(v)
 {
-  cat("missing_data_rates: ", missing_data_rates, "\n")
-  vectors <- lapply(missing_data_rates, function(r) mutilated(full_vector, r))
-  rr_missings = mclapply(vectors, function(v) calculate_relevance_resolution_vector(v,na_tolerance = na_tolerance, max_bins = max_bins, no_data_out = no_data_out, na_values_handler = na_values_handler), mc.cores = 1)
-  legend_names <- paste(missing_data_rates*100, "% miss.", sep = "")
-  rr_plots(rr_missings, title = info, legend_names = legend_names)
-  return(list(rr_data = rr_missings, missing_rates = missing_data_rates, na_tolerance = na_tolerance, max_bins = max_bins, info = info))
+  v[2*(0:(ceiling(length(v)/2)-1))+1]
 }
 
-
-
-apply_same_missing_data_pattern <- function(vector, mask_vector)
+pos_to_neighbor_counts  <- function(pos, dinucleotides_neighborhood_ranges, centered = T)
 {
-  v <- vector
-  v[is.na(mask_vector)] = NA
-  return(v)
+  max_half = max(dinucleotides_neighborhood_ranges)/2
+  v = (pos - min(pos) + 1)+max_half
+  v2 = sparseVector(i = v, x = T, length = max(v)+max_half)
+  cumulative_sum_vector <- corrected_cumsum(v2)
+  result = sapply(dinucleotides_neighborhood_ranges, function(r)
+  {
+    cumulative_sum_vector[v+r/2]-cumulative_sum_vector[v-r/2]
+  })
+  remove(cumulative_sum_vector)
+  colnames(result) <- (dinucleotides_neighborhood_ranges)
+  gc()
+  return(as.data.frame(result))
 }
 
+random_binary_vector <- function(l, prop)
+{
+  M <- round(l*prop)
+  bin <- array(dim = l, 0)
+  bin[sample(1:l, M)] <- 1
+  return((bin))
+}
 
-##############################################################################
+inverse = function(f, lower = -100, upper = 100) {
+  function (y) uniroot((function (x) f(x) - y), lower = lower, upper = upper)[1]$root
+}
+
+filter_by_range <- function(v, min, max)
+{
+  v <- v[v>=min]
+  v[v<=max]
+}
+
+#####################################################
+
+
+# BASE SEQUENCE MSR STUDY
+
 suppressMessages(library(Matrix))
 suppressMessages(library(BSgenome.Mmusculus.UCSC.mm10))
 suppressMessages(library(BSgenome.Hsapiens.UCSC.hg38))
 suppressMessages(require(Biostrings))
-
-#load("DataCleaning/CpG_sites_dataframe.RData")
 
 nucleotides_pattern_positions <- function(chromosome, pattern, Genome = BSgenome.Hsapiens.UCSC.hg38)
 {
@@ -587,109 +641,23 @@ binary_nucleotides_pattern_positions <- function(chromosome, pattern, Genome = B
   return(sparseVector(i = positions, length = chromosome_size, x = T))
 }
 
-mouse_dinucleotides_experiment <- function(pattern_list, chromosome)
+basis_pattern_rr_curve_comparison <- function(patterns, chromosome, min, max, Genome = BSgenome.Hsapiens.UCSC.hg38, same_M = F, discrete = F)
 {
-  
-  rr_list <- lapply(pattern_list, function(p) {
-    chr_p <- binary_nucleotides_pattern_positions(chromosome,p)
-    rr_chr_p <- calculate_relevance_resolution_vector_ignoring_nas(chr_p)
-    remove(chr_p)
-    gc()
-    return(rr_chr_p)
+  v_list <- lapply(patterns, function(p) {
+    x <- nucleotides_pattern_positions(chromosome, p, Genome)
+    if(same_M)
+      return(x[min:max])
+    filter_by_range(x, min, max)
   })
   
-  gc()
-  
-  areas <- array(length(rr_list))
-  for(i in 1:length(rr_list))
-  {
-    areas[i] <- MSR_area(rr_list[[i]], M_correction = sum(binary_nucleotides_pattern_positions(chromosome,pattern_list[i])))
-  }
-  
-  cat("\nMSR corrected areas: ", areas)
-  
-  rr_plots(rr_list, title = "dinucleotides_MSR_comparison", legend_names = pattern_list)
-  
-  return((List(rr = rr_list, areas = areas)))
+  rr_curve_comparison(v_list, legend_names = patterns, discrete = discrete)
+  title(paste(chromosome, "from basis", min, "to", max))
 }
 
+#####################################################
 
-#############################################################################
 
-subset_positions <- function(pos, start, size) { pos[pos>=start & pos<=(start+size)] }
-
-pos_to_neighbor_counts  <- function(pos, dinucleotides_neighborhood_ranges, centered = T)
-{
-  max_half = max(dinucleotides_neighborhood_ranges)/2
-  v = (pos - min(pos) + 1)+max_half
-  v2 = sparseVector(i = v, x = T, length = max(v)+max_half)
-  cumulative_sum_vector <- corrected_cumsum(v2)
-  #cat("\ncumulative_sum_vector: ", cumulative_sum_vector)
-  #cat("\npos: ", pos, "\n")
-  #cat("v: ", v, "\n")
-  result = sapply(dinucleotides_neighborhood_ranges, function(r)
-  {
-    cumulative_sum_vector[v+r/2]-cumulative_sum_vector[v-r/2]
-  })
-  remove(cumulative_sum_vector)
-  colnames(result) <- (dinucleotides_neighborhood_ranges)
-  gc()
-  return(as.data.frame(result))
-  #sum(pos<pos+half & pos>pos-half)
-}
-
-filter_odd_position_values <- function(v)
-{
-  v[2*(0:(ceiling(length(v)/2)-1))+1]
-}
-
-get_CpG_densities <- function(dinucleotides_neighborhood_ranges, Genome = BSgenome.Hsapiens.UCSC.hg38, data = NA)
-{
-  chr_list = chromosomes(Genome = BSgenome.Hsapiens.UCSC.hg38)
-  n = length(chr_list)
-
-  CpGlists <- lapply(chr_list, function(chr)
-    {
-     cat("processing ", chr, "\n")
-    if(type(data)=="logical")
-      pos <- nucleotides_pattern_positions(chr, "CG", Genome = Genome)
-    else
-      pos <- filter_odd_position_values(filter_chromosome(data,chr)$Cpos)
-     gc()
-     pos_to_neighbor_counts(pos, dinucleotides_neighborhood_ranges)
-    })
-     gc()
-  
-  result <- data.frame()
-  
-  for(p in CpGlists)
-  {
-    result = rbind(result,p)
-  }
-
-  return(result)
-}
-
-autocor <- function(v, lag)
-{
-  l = length(v)
-  plot(v[1:(l-lag)],v[(1+lag):l])
-  cor.test(v[1:(l-lag)],v[(1+lag):l])
-}
-
-autotable <- function(v, lag)
-{
-  l = length(v)
-  table(v[1:(l-lag)],v[(1+lag):l])
-}
-
-random_binary_vector <- function(l, prop)
-{
-  M <- round(l*prop)
-  bin <- array(dim = l, 0)
-  bin[sample(1:l, M)] <- 1
-  return((bin))
-}
+# MSR STATSTICAL ANALYSIS
 
 sample_msr <- function(l, prop)
 {
@@ -711,21 +679,6 @@ msr_samples <- function(l, prop, sample_size, cores = 1, verbose = F)
   return(msr_samples)
 }
 
-msr_significance_experiment <- function(l,prop_list, samples_size, cores = 1, verbose = F)
-{
-  start_time <- Sys.time()
-  exp = mcmapply(prop_list, mc.preschedule = T, mc.cores = cores, FUN =  function(p)
-  {
-    if(verbose) cat(p, " ")
-    msr_samples(l, p, samples_size, cores = 1, verbose = F)
-  })
-  cat("time: ", Sys.time()-start_time)
-  
-  exp = t(exp)
-  rownames(exp) <- prop_list
-  return(List(data=exp, prop_list=prop_list))
-}
-
 get_msr_ecdf <- function(l, prop, sample_size, cores = 1)
 {
   return(ecdf(msr_samples(l, prop, sample_size, verbose = F, cores = cores)))
@@ -741,10 +694,6 @@ get_msr_ecdfs <- function(l, prop_list, sample_size, cores = 1)
     })
 }
 
-inverse = function(f, lower = -100, upper = 100) {
-  function (y) uniroot((function (x) f(x) - y), lower = lower, upper = upper)[1]$root
-}
-
 msr_confidence_line <- function(ecdfs, confidence = 0.99)
 {
   sapply(ecdfs, function(f)
@@ -753,8 +702,6 @@ msr_confidence_line <- function(ecdfs, confidence = 0.99)
     c(f$prop, inverse(f$cdf, 0, 0.4)(confidence))
   })
 }
-
-
 
 add_msr_confidence_line <- function(ecdfs, confidence = 0.99, col = 1, lty = 2)
 {
@@ -799,120 +746,6 @@ general_msr_cdf <- function(ecdfs, density, msr)
   }
 }
 
-
-
-#markovchain_fake_data <- function(size, transition_matrix)
-#{
-#  model <- new("markovchain", states = c("0","1"), transitionMatrix = transition_matrix)
-#  as.integer(rmarkovchain(size, object = meth_model, t0 = "0"))
-#}
-
-
-prop_msr_samples <- function(l, props, sample_size, cores = 1, verbose = F)
-{
-  start_time <- Sys.time()
-  msr_samples = mcmapply(1:sample_size, mc.preschedule = T, mc.cores = cores, FUN =  function(n)
-  {
-    v = rbinom(n = l, size = 1, prob = probs)
-    rr_v <- calculate_relevance_resolution_vector(methylation_vector = v, verbose = F, na_tolerance = 0.1)
-    MSR_area(rr_v)
-  })
-  if(verbose) cat("time: ", Sys.time()-start_time)
-  
-  return(msr_samples)
-}
-
-plot_positions <- function(positions)
-{ 
-  positions <- positions-min(positions)
-  plot(x = c(0, 1), y = c(0,0), col = alpha(1, 0.4), ylab = "", xlab = "Positions", type = "l", yaxt='n')
-  points(x = positions/max(positions), y=array(data = 0, dim = length(positions)), pch = "|", ylab = "")
-}
-
-MSR_example <- function(positions, perturb = 0, max_gbins = 50)
-{
-  if(perturb)
-  {
-    s <- sort(positions)
-    sd <- mean(s[2:length(s)]-s[1:(length(s)-1)])*perturb
-    positions <- s + rnorm(length(s), sd = sd)
-  }
-  
-  rr <- positions_MSR(positions, msr = F, max_gbins = max_gbins)
-  msr <- MSR_area(rr)
-  plot_positions(positions - min(positions))
-  resolution_relevance_plot(rr)
-  title(paste("MSR:", round(msr, digits = 3)))
-}
-
-MSR_visualization <- function(positions, discretization_bin_size = NA, perturb = 0, max_bins = 1e6, maxg_bins = 50)
-{
-  if(perturb)
-  {
-    s <- sort(positions)
-    sd <- mean(s[2:length(s)]-s[1:(length(s)-1)])*perturb
-    positions <- s + rnorm(length(s), sd = sd)
-  }
-    
-  rr <- positions_MSR(positions, discretization_bin_size, F, F, max_bins = max_bins, max_gbins = maxg_bins)
-  msr <- MSR_area(rr)
-  resolution_relevance_plot(rr)
-  title(paste("MSR:", round(msr, digits = 4)))
-}
-
-rr_curve_comparison <- function(v_list, legend_names, add_msr = T, discrete = F, max_gbins = 20)
-{
-  rr_list <- lapply(v_list, function(x)
-    {
-    positions_MSR(x, max_bins = 1e6, discrete = discrete, max_gbins = max_gbins, msr = F)
-  })
-  
-  
-  msr_list <- sapply(rr_list, MSR_area)
-  
-  if(add_msr)
-    legend_names <- as.character(sapply(1:length(legend_names), function(i){paste(legend_names[i], round(msr_list[i],3), sep = ": ")}))
-  
-  ord <- order(msr_list, decreasing = T)
-  
-  plotter = plot
-  for(i in ord)
-  {
-    resolution_relevance_plot(rr_list[[i]], alpha(i+1, 0.5), plotter, area_alpha = 0.1)
-    plotter = points
-  }
-  
-  legend("topleft", legend=legend_names[ord], col=ord+1, y.intersp = 1, cex = 1.1, bty = "n", fill=ord+1, x.intersp = 0.3)
-  
-}
-
-filter_by_range <- function(v, min, max)
-{
-  v <- v[v>=min]
-  v[v<=max]
-}
-
-basis_pattern_rr_curve_comparison <- function(patterns, chromosome, min, max, Genome = BSgenome.Hsapiens.UCSC.hg38, same_M = F, discrete = F)
-{
-  v_list <- lapply(patterns, function(p) {
-    x <- nucleotides_pattern_positions(chromosome, p, Genome)
-    if(same_M)
-      return(x[min:max])
-    filter_by_range(x, min, max)
-  })
-  
-  rr_curve_comparison(v_list, legend_names = patterns, discrete = discrete)
-  title(paste(chromosome, "from basis", min, "to", max))
-}
-
-#setwd("./Scrivania/Tesi/MethylationCode/")
-#directory <- "MethylationData/binary_rate/"
-
-#cell_files <- list.files(directory,pattern="(_converted.Rda)$")
-#cell_names <- sub("_converted.Rda","", cell_files)
-#methylation_vector <- as.logical(readRDS("MethylationData/binary_rate/GSM3436261_O1_TA_Hi_10_converted.Rda"))
-
-
 make_random_msr_data_frame <- function(length, samples, lw = 0, hp = 1, verbose = T)
 {
   p <- runif(samples, lw, hp)
@@ -949,71 +782,4 @@ make_random_msr_data_frame2 <- function(samples, lw = 100, hp = 10000, verbose =
   return(data.frame(M=M,msr=msr))
 }
 
-find_correct_position <- function(vector, target, start)
-{
-  for(i in start:length(vector))
-    if(target<vector[i])
-      return(i)
-  return(length(vector)+1)
-}
-
-assign_positions <- function(vector, target)
-{
-  l <- length(vector)
-  pos <- array(dim=length(target)+1)
-  pos[1]<-1
-  for(i in 1:length(target))
-  {
-    #cat("ciao: ", i)
-    pos[i+1] <- find_correct_position(vector, target[i], pos[i])
-  }
-  pos[2:length(pos)]#-1
-}
-
-my_hist <- function(ordered_sample, n_bins, sorted = F)
-{
-  if(!sorted)
-    ordered_sample <- sort.default(ordered_sample)
-  p <- assign_positions(sort.default(ordered_sample), linspace(min(ordered_sample),max(ordered_sample),n_bins+1))
-  v <- 1:(length(p)-1)
-  p[v+1]-p[v]
-}
-
-
-correct_positions_MSR <- function(positions, msr = T, max_bins = 1e6, max_gbins = 100, timing = F)
-{
-  if(timing)
-    tim <- Sys.time(); 
-  
-  if(length(positions)<2) return(NA)
-  positions <- positions[!is.na(positions)]
-  positions <- sort.default(positions)
-  a <- min(positions)
-  b <- max(positions)
-  
-  minimum_bin_size <- max(((b-a)/max_bins), min(positions[2:length(positions)]-positions[1:(length(positions)-1)]) )
-  minimum_bin_size <- min(minimum_bin_size, ((b-a)/100))
-  gbins <- rev(good_bin_sizesV2(round((b-a)/minimum_bin_size), max_gbins))
-  #gbins <- gbins(0,gbins)
-
-  if(timing)
-    cat("\n precomp time: ", Sys.time()-tim)
-  
-  if(timing)
-    s <- Sys.time(); 
-    rr <- sapply(gbins, function(bins){
-      c <- hist(positions, plot = F, breaks = linspace(a,b,bins+1))$counts
-      c(efficient_resolution_relevance_from_counts(c), bins, 1)
-      })
-  
-  rr <- add_max_resolution_point_if_needed(rr)
-  
-  if(timing)
-    cat("\n calculation time: ", Sys.time()-s, "\n")
-  
-  if(msr)
-    return(MSR_area(rr))
-  cat(MSR_area(rr))
-  return(rr)
-}
-
+##############################################################

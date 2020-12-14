@@ -1,5 +1,6 @@
-setwd(dir = "Scrivania/Tesi/Methylation-project/Code/")
-source("WGBS_analysis_functions.R", chdir = T)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+source("./WGBS_analysis_functions.R", chdir = T)
+
 
 # fragmets_msr_table
 wgbs_file <- "../../MethylationCode/MethylationData/wgbs/ENCFF752NXS_GM23248.rda"
@@ -11,12 +12,14 @@ msr_ecdf_file <- "../../MethylationCode/MethylationData/msr_ecdf_1e3.Rda"
 msr_exp_complete(wgbs_file, short_name, size, msr_ecdf_file, na_tolerance = 0.4, minimum_reads=1, dir = "../../Rexperiments/")
 ########
 
+
 # genes table
 short_name <- "HelaS3"
 wgbs_file  <- "../../MethylationCode/MethylationData/wgbs/ENCFF157VZT_HeLa_S3.Rda"
 genebody_annotation_file <- "../../Rexperiments/detailed_genebody_improved.Rda"
 produce_and_save_genes_msr_table(wgbs_file, short_name, genebody_annotation_file, gene_type_filter = NA, na_tolerance = 0.4, no_msr = F, dir = "../../Rexperiments/")
 ########
+
 
 # fragments_expression_table
 short_name <- "Hela"
@@ -31,10 +34,8 @@ produce_and_save_fragments_expression_table(wgbs_file, expression_file, genebody
 
 # all
 short_names <- c("H1", "K562", "GM12878", "GM23248", "Hela", "endodermal", "lung", "stomach")
-#short_names <- c("H1", "K562", "GM12878", "GM23248", "Hela", "endodermal", "lung")
-short_names <- c("H1", "GM12878")
-size <- 1e4
-msr_ecdf_file <- "../../MethylationCode/MethylationData/msr_ecdf_1e4.Rda"
+size <- 1e3
+msr_ecdf_file <- "../../MethylationCode/MethylationData/msr_ecdf_1e3.Rda"
 ignore_gene_version = T
 dir = "../../Rexperiments/final/"
 genebody_annotation_file <- "../../Rexperiments/detailed_genebody_improved.Rda"
@@ -46,15 +47,10 @@ gc(verbose=F)
 wgbs_file <- get_file_names(dir = "../../MethylationCode/MethylationData/wgbs", patterns = short_name, T); cat("\n", wgbs_file)
 wgbs_file <- sum_strands(readRDS(wgbs_file))
 expression_file <- get_file_names(dir = "../../MethylationCode/MethylationData/rna-seq", patterns = c(short_name, "poly"), T); cat("\n", expression_file)
-genebody_annotation_file <- "../../Rexperiments/detailed_genebody_improved.Rda"
+
 produce_and_save_fragments_expression_table(wgbs_file, expression_file, genebody_annotation_file, size, ignore_gene_version, short_name, dir = dir); gc(verbose=F)
-#produce_and_save_genes_msr_table(wgbs_file, short_name, genebody_annotation_file, gene_type_filter = NA, na_tolerance = 0.4, no_msr = F, dir = dir); gc(verbose=F)
+produce_and_save_genes_msr_table(wgbs_file, short_name, genebody_annotation_file, gene_type_filter = NA, na_tolerance = 0.4, no_msr = F, dir = dir); gc(verbose=F)
 #produce_and_save_fragments_msr_table(wgbs_file, short_name, size, msr_ecdf_file, na_tolerance = 0.4, minimum_reads=1, dir = dir); gc(verbose=F)
 msr_exp_complete(wgbs_file, short_name, size, msr_ecdf_file, na_tolerance = 0.4, minimum_reads=1, dir = "../../Rexperiments/"); gc(verbose=F)
 }
 ########
-
-
-# add_feature_to_table("Scrivania/Tesi/Rexperiments/H1_msr_complete_experimental_table_1000.Rda",
-#                      "Scrivania/Tesi/MethylationCode/MethylationData/wgbs/ENCFF601NBW_H1.rda",
-#                      mean_be, "mean_bernoulli_entropy")
